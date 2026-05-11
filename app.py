@@ -38,21 +38,416 @@ _NODE_LABELS: dict = {
     "Portfolio Manager":     "🏆 Portfolio Manager",
 }
 
-_DEPTH_CFG = {
-    "⚡ Shallow":  {"max_debate_rounds": 1, "max_risk_discuss_rounds": 1},
-    "⚖️ Standard": {"max_debate_rounds": 1, "max_risk_discuss_rounds": 2},
-    "🔬 Deep":     {"max_debate_rounds": 2, "max_risk_discuss_rounds": 3},
+# Index-based depth config (0=Shallow, 1=Standard, 2=Deep)
+_DEPTH_CFG = [
+    {"max_debate_rounds": 1, "max_risk_discuss_rounds": 1},
+    {"max_debate_rounds": 1, "max_risk_discuss_rounds": 2},
+    {"max_debate_rounds": 2, "max_risk_discuss_rounds": 3},
+]
+
+# ── UI Translations ────────────────────────────────────────────────────────────
+_T = {
+    "en": {
+        # Welcome screen
+        "wc_sub":              "Multi-Agent Stock Analysis",
+        "wc_name_label":       "What's your name?",
+        "wc_name_placeholder": "Enter your name…",
+        "wc_enter":            "Enter →",
+        # Sidebar
+        "logo_sub":            "Powered by Claude CLI",
+        "welcome_back":        "Welcome back",
+        "change_name":         "✏️ Change Name",
+        "div_ui_lang":         "UI Language",
+        "nav_new":             "New Analysis",
+        "nav_saas":            "SaaS Finder",
+        "nav_browse":          "Browse Reports",
+        "nav_log":             "Signal Log",
+        "div_config":          "Configuration",
+        "ticker_label":        "Stock Ticker",
+        "ticker_placeholder":  "e.g. NVDA, TSLA, 0700.HK",
+        "date_label":          "Analysis Date",
+        "div_analysts":        "Analysts",
+        "cb_market":           "Market (Technical)",
+        "cb_news":             "News",
+        "cb_fundamentals":     "Fundamentals",
+        "cb_valuation":        "Valuation & Peers",
+        "cb_valuation_help":   "Peer P/E, EV/EBITDA comparison",
+        "cb_macro":            "Macro (Fed/CPI/Yield)",
+        "cb_macro_help":       "Cached 7 days — very fast on repeats",
+        "cb_social":           "Social (= News data)",
+        "cb_social_help":      "yfinance doesn't have Reddit/Twitter data",
+        "cb_options":          "Options (LEAP vs Stock)",
+        "cb_options_help":     "Fetches yfinance options chain, recommends LEAP vs buying stock",
+        "div_depth":           "Depth",
+        "depth_0":             "⚡ Shallow",
+        "depth_1":             "⚖️ Standard",
+        "depth_2":             "🔬 Deep",
+        "depth_hint_0":        "1 debate · 1 risk round",
+        "depth_hint_1":        "1 debate · 2 risk rounds",
+        "depth_hint_2":        "2 debates · 3 risk rounds",
+        "div_model":           "Model",
+        "model_quick":         "Quick (analysts)",
+        "model_deep":          "Deep (PM & research)",
+        "div_lang":            "Language",
+        "run_btn":             "🚀  Run Analysis",
+        "no_analyst_warn":     "Select at least one analyst.",
+        "run_hint":            "💡 First run ~3–5 min · Results auto-saved to reports/",
+        # New Analysis landing
+        "landing_info":        "Configure your analysis in the sidebar and click **Run Analysis**.",
+        "how_it_works":        "#### How it works",
+        "how_steps":           "1. **Analysts** pull live market data\n2. **Bull & Bear** debate the thesis\n3. **Trader** builds a trade proposal\n4. **Risk team** stress-tests sizing\n5. **Portfolio Manager** → BUY / HOLD / SELL",
+        "agent_pipeline":      "#### Agent pipeline",
+        # Running
+        "analyzing":           "Analyzing",
+        "elapsed":             "Elapsed",
+        "steps":               "steps",
+        "initializing":        "Initializing agents…",
+        # Result
+        "analysis_date":       "Analysis date:",
+        "analysis_failed":     "Analysis failed:",
+        "completed_cap":       "Completed: **{ticker}** · {date} · Change ticker/date in sidebar to rerun.",
+        # Result tabs
+        "tab_final":           "Final Decision",
+        "tab_trader":          "Trader Plan",
+        "tab_research":        "Research Manager",
+        "tab_market":          "Market",
+        "tab_news":            "News",
+        "tab_fundamentals":    "Fundamentals",
+        "tab_valuation":       "Valuation",
+        "tab_macro":           "Macro",
+        "tab_options":         "Options",
+        "tab_sentiment":       "Sentiment",
+        "tab_risk":            "Risk Debate",
+        "no_final":            "_No final decision recorded._",
+        "no_market":           "_Market analyst not selected._",
+        "no_news":             "_News analyst not selected._",
+        "no_fund":             "_Fundamentals analyst not selected._",
+        "no_val":              "_Valuation analyst not selected._",
+        "no_macro":            "_Macro analyst not selected._",
+        "no_opt":              "_Options analyst not selected. Enable 'Options (LEAP vs Stock)' in the sidebar._",
+        "no_sent":             "_Sentiment analyst not selected._",
+        # Browse Reports
+        "browse_title":        "### 📂 Browse Reports",
+        "no_reports":          "No reports saved yet. Run an analysis first.",
+        "no_reports2":         "No reports saved yet.",
+        "mode_view":           "📄 View Report",
+        "mode_compare":        "📊 Compare Dates",
+        "mode_delete":         "🗑️ Delete",
+        "del_warn":            "Select a report to permanently delete it.",
+        "del_ticker_lbl":      "Ticker",
+        "del_date_lbl":        "Date",
+        "del_will":            "**Will delete:**",
+        "del_confirm":         "🗑️ Confirm Delete",
+        "del_success":         "Deleted {ticker} / {date}",
+        "no_ticker_dates":     "No reports for this ticker.",
+        "cmp_need2":           "Need at least 2 saved dates for the same ticker to compare.",
+        "cmp_select":          "Select dates to compare",
+        "signal_timeline":     "#### Signal Timeline",
+        "key_points":          "#### Key Points by Date",
+        "field_compare":       "Field to compare",
+        "ai_compare":          "#### 🤖 AI Comparison",
+        "ai_compare_cap":      "Sends only the extracted summaries (~2 KB) — not the full reports.",
+        "compare_btn":         "Compare with Claude",
+        "comparing":           "Comparing with Claude…",
+        "no_summary":          "No summary.json — re-run analysis to generate",
+        "overwrite_notice":    "💡 Re-running **{ticker}** on **{date}** will overwrite this report. Use a different date to keep both.",
+        "no_data_label":       "No data for {label}.",
+        "no_files":            "No files saved for this section.",
+        "no_ticker_reports":   "No reports for {ticker}.",
+        # Section / sub-tab labels
+        "sec_analysts":        "I · Analysts",
+        "sec_research":        "II · Research",
+        "sec_trading":         "III · Trading",
+        "sec_risk":            "IV · Risk",
+        "sec_portfolio":       "V · Portfolio",
+        "sub_market":          "📈 Market",
+        "sub_news":            "📰 News",
+        "sub_fundamentals":    "🏢 Fundamentals",
+        "sub_valuation":       "🔢 Valuation",
+        "sub_macro":           "🌐 Macro",
+        "sub_sentiment":       "💬 Sentiment",
+        "sub_options":         "💵 Options",
+        "sub_bull":            "🟢 Bull",
+        "sub_bear":            "🔴 Bear",
+        "sub_manager":         "👔 Research Mgr",
+        "sub_trader":          "🤝 Trader",
+        "sub_aggressive":      "🔴 Aggressive",
+        "sub_conservative":    "🟢 Conservative",
+        "sub_neutral":         "🟡 Neutral",
+        "sub_decision":        "🏆 Final Decision",
+        # Signal Log
+        "log_title":           "### 📊 Signal Log",
+        "no_signals":          "No signals logged yet. Signal log is created after your first analysis.",
+        "log_empty":           "Signal log is empty.",
+        "log_total":           "Total",
+        "log_error":           "Could not read signal log:",
+        # SaaS Finder
+        "saas_title":          "### 🔍 SaaS Finder — 护城河四维度 Moat Scanner",
+        "saas_caption":        "Uses Claude to identify publicly-traded SaaS companies with the strongest moats across four dimensions: Distribution · Proprietary Data · Integration · Regulatory.",
+        "saas_how_title":      "📖 How to interpret scores",
+        "saas_explanation":    """\
+**Four-Dimension Moat Framework — each dimension scored 1–10, total out of 40**
+
+| Dimension | What it measures |
+|-----------|-----------------|
+| **Distribution** | Switching cost, workflow integration depth, viral or enterprise distribution strength |
+| **Proprietary Data** | Whether the product gets smarter with usage; unique datasets competitors cannot replicate |
+| **Integration Depth** | Number of mission-critical integrations (ERP, CRM); replacement complexity; bundle lock-in |
+| **Regulatory / Compliance** | SOC 2, HIPAA, FedRAMP certifications as entry barriers; regulated-industry dominance |
+
+**Total Score Interpretation (/40)**
+- 🟢 **30–40** — Strong moat: highly defensible business with compounding advantages
+- 🟡 **22–29** — Moderate moat: meaningful advantages but exposed to competitive pressure
+- 🔴 **< 22** — Weak moat: limited defensibility; elevated AI disruption risk
+
+**AI Stance**
+- **Builder** — develops proprietary AI on top of their data; stronger moat over time
+- **Buyer** — uses third-party AI; moat depends on data and distribution, not AI itself""",
+        "saas_n_label":        "Number of companies",
+        "saas_sector_label":   "Sector filter (optional)",
+        "saas_sector_ph":      "e.g. Fintech, HR-Tech, DevOps, Healthcare",
+        "saas_submit":         "🔍 Find SaaS Moats",
+        "saas_spinner":        "Running SaaS Finder analysis… (may take 1–2 min)",
+        "saas_error":          "SaaS Finder error:",
+        "saas_results_title":  "#### Top {n} Companies by Moat Score",
+        "saas_legend":         "🟢 ≥ 30 Strong moat  ·  🟡 22–29 Moderate  ·  🔴 < 22 Weak",
+        "saas_detail_title":   "#### Detailed Analysis",
+        "saas_sector_lbl":     "**Sector:**",
+        "saas_ai_stance_lbl":  "**AI Stance:**",
+        "saas_ai_data_adv":    "**AI Data Advantage:**",
+        "saas_ai_threat":      "**AI Threat:**",
+        "saas_core_thesis":    "**Core Thesis:**",
+        "saas_key_risk":       "**Key Risk:**",
+        "dist_label":          "Distribution",
+        "data_label":          "Data",
+        "integ_label":         "Integration",
+        "reg_label":           "Regulatory",
+    },
+    "zh": {
+        # Welcome screen
+        "wc_sub":              "多智能体股票分析系统",
+        "wc_name_label":       "你叫什么名字？",
+        "wc_name_placeholder": "输入你的名字…",
+        "wc_enter":            "进入 →",
+        # Sidebar
+        "logo_sub":            "由 Claude CLI 驱动",
+        "welcome_back":        "欢迎回来",
+        "change_name":         "✏️ 修改名字",
+        "div_ui_lang":         "界面语言",
+        "nav_new":             "新分析",
+        "nav_saas":            "SaaS 筛选",
+        "nav_browse":          "浏览报告",
+        "nav_log":             "信号记录",
+        "div_config":          "配置",
+        "ticker_label":        "股票代码",
+        "ticker_placeholder":  "例如 NVDA、TSLA、0700.HK",
+        "date_label":          "分析日期",
+        "div_analysts":        "分析师",
+        "cb_market":           "市场（技术面）",
+        "cb_news":             "新闻",
+        "cb_fundamentals":     "基本面",
+        "cb_valuation":        "估值与同行",
+        "cb_valuation_help":   "同行市盈率、EV/EBITDA 对比",
+        "cb_macro":            "宏观（美联储/CPI/收益率）",
+        "cb_macro_help":       "缓存7天，重复运行极快",
+        "cb_social":           "社交（= 新闻数据）",
+        "cb_social_help":      "yfinance 无 Reddit/Twitter 数据",
+        "cb_options":          "期权（LEAP vs 正股）",
+        "cb_options_help":     "获取期权链，建议 LEAP vs 正股",
+        "div_depth":           "分析深度",
+        "depth_0":             "⚡ 浅析",
+        "depth_1":             "⚖️ 标准",
+        "depth_2":             "🔬 深度",
+        "depth_hint_0":        "1轮辩论 · 1轮风险",
+        "depth_hint_1":        "1轮辩论 · 2轮风险",
+        "depth_hint_2":        "2轮辩论 · 3轮风险",
+        "div_model":           "模型",
+        "model_quick":         "快速（分析师）",
+        "model_deep":          "深度（PM & 研究）",
+        "div_lang":            "输出语言",
+        "run_btn":             "🚀  开始分析",
+        "no_analyst_warn":     "请至少选择一个分析师。",
+        "run_hint":            "💡 首次运行约3-5分钟 · 结果自动保存至 reports/",
+        # New Analysis landing
+        "landing_info":        "在侧边栏配置分析参数，点击**开始分析**。",
+        "how_it_works":        "#### 工作原理",
+        "how_steps":           "1. **分析师**拉取实时市场数据\n2. **多空**双方辩论投资逻辑\n3. **交易员**制定交易方案\n4. **风险团队**压力测试仓位\n5. **投资组合经理** → 买入 / 持有 / 卖出",
+        "agent_pipeline":      "#### 智能体流程",
+        # Running
+        "analyzing":           "正在分析",
+        "elapsed":             "已用时",
+        "steps":               "步骤",
+        "initializing":        "正在初始化智能体…",
+        # Result
+        "analysis_date":       "分析日期：",
+        "analysis_failed":     "分析失败：",
+        "completed_cap":       "完成：**{ticker}** · {date} · 在侧边栏修改代码/日期可重新运行。",
+        # Result tabs
+        "tab_final":           "最终决策",
+        "tab_trader":          "交易方案",
+        "tab_research":        "研究经理",
+        "tab_market":          "市场",
+        "tab_news":            "新闻",
+        "tab_fundamentals":    "基本面",
+        "tab_valuation":       "估值",
+        "tab_macro":           "宏观",
+        "tab_options":         "期权",
+        "tab_sentiment":       "情绪",
+        "tab_risk":            "风险辩论",
+        "no_final":            "_无最终决策记录。_",
+        "no_market":           "_市场分析师未启用。_",
+        "no_news":             "_新闻分析师未启用。_",
+        "no_fund":             "_基本面分析师未启用。_",
+        "no_val":              "_估值分析师未启用。_",
+        "no_macro":            "_宏观分析师未启用。_",
+        "no_opt":              "_期权分析师未启用。请在侧边栏启用「期权（LEAP vs 正股）」。_",
+        "no_sent":             "_情绪分析师未启用。_",
+        # Browse Reports
+        "browse_title":        "### 📂 浏览报告",
+        "no_reports":          "暂无报告，请先运行分析。",
+        "no_reports2":         "暂无报告。",
+        "mode_view":           "📄 查看报告",
+        "mode_compare":        "📊 对比日期",
+        "mode_delete":         "🗑️ 删除",
+        "del_warn":            "选择要永久删除的报告。",
+        "del_ticker_lbl":      "股票代码",
+        "del_date_lbl":        "日期",
+        "del_will":            "**将删除：**",
+        "del_confirm":         "🗑️ 确认删除",
+        "del_success":         "已删除 {ticker} / {date}",
+        "no_ticker_dates":     "此股票暂无报告。",
+        "cmp_need2":           "需要至少2个日期才能对比。",
+        "cmp_select":          "选择要对比的日期",
+        "signal_timeline":     "#### 信号时间线",
+        "key_points":          "#### 各日期关键点",
+        "field_compare":       "对比字段",
+        "ai_compare":          "#### 🤖 AI 对比分析",
+        "ai_compare_cap":      "仅发送提取的摘要（约2KB），不发送完整报告。",
+        "compare_btn":         "用 Claude 对比",
+        "comparing":           "正在用 Claude 对比…",
+        "no_summary":          "无 summary.json — 重新运行分析以生成",
+        "overwrite_notice":    "💡 在 **{date}** 重新运行 **{ticker}** 将覆盖此报告。使用不同日期可保留两份。",
+        "no_data_label":       "{label} 无数据。",
+        "no_files":            "本节无保存文件。",
+        "no_ticker_reports":   "{ticker} 无报告。",
+        # Section / sub-tab labels
+        "sec_analysts":        "I · 分析师",
+        "sec_research":        "II · 研究",
+        "sec_trading":         "III · 交易",
+        "sec_risk":            "IV · 风险",
+        "sec_portfolio":       "V · 投资组合",
+        "sub_market":          "📈 市场",
+        "sub_news":            "📰 新闻",
+        "sub_fundamentals":    "🏢 基本面",
+        "sub_valuation":       "🔢 估值",
+        "sub_macro":           "🌐 宏观",
+        "sub_sentiment":       "💬 情绪",
+        "sub_options":         "💵 期权",
+        "sub_bull":            "🟢 多方",
+        "sub_bear":            "🔴 空方",
+        "sub_manager":         "👔 研究经理",
+        "sub_trader":          "🤝 交易员",
+        "sub_aggressive":      "🔴 激进",
+        "sub_conservative":    "🟢 保守",
+        "sub_neutral":         "🟡 中性",
+        "sub_decision":        "🏆 最终决策",
+        # Signal Log
+        "log_title":           "### 📊 信号记录",
+        "no_signals":          "暂无信号记录。运行第一次分析后将自动创建。",
+        "log_empty":           "信号记录为空。",
+        "log_total":           "总计",
+        "log_error":           "无法读取信号记录：",
+        # SaaS Finder
+        "saas_title":          "### 🔍 SaaS 筛选器 — 护城河四维度扫描",
+        "saas_caption":        "使用 Claude 识别护城河最强的上市 SaaS 公司，评分维度：分销 · 专有数据 · 集成深度 · 合规壁垒。",
+        "saas_how_title":      "📖 如何解读评分",
+        "saas_explanation":    """\
+**护城河四维度框架 — 每个维度评分 1–10，总分满分 40**
+
+| 维度 | 评估内容 |
+|------|---------|
+| **分销护城河** | 客户切换成本、工作流集成深度、病毒式传播或企业合同覆盖 |
+| **专有数据护城河** | 产品是否随使用越来越智能；竞争对手无法复制的独特数据集 |
+| **集成深度护城河** | 关键业务集成数量（ERP/CRM）；替换复杂度；多产品套件锁定 |
+| **合规护城河** | SOC 2、HIPAA、FedRAMP 认证形成的壁垒；受监管行业主导地位 |
+
+**总分解读（/40）**
+- 🟢 **30–40** — 强护城河：高度可防御的业务，优势持续复利增长
+- 🟡 **22–29** — 中等护城河：有实质性优势，但面临竞争压力
+- 🔴 **< 22** — 弱护城河：防御力有限，AI 颠覆风险较高
+
+**AI 立场说明**
+- **Builder（构建者）** — 在自有数据上开发专有AI；护城河随时间加深
+- **Buyer（使用者）** — 使用第三方AI；护城河依赖数据与分销，而非AI本身""",
+        "saas_n_label":        "公司数量",
+        "saas_sector_label":   "行业筛选（可选）",
+        "saas_sector_ph":      "例如 Fintech、HR-Tech、DevOps、Healthcare",
+        "saas_submit":         "🔍 寻找 SaaS 护城河",
+        "saas_spinner":        "正在运行 SaaS 筛选分析…（约需1-2分钟）",
+        "saas_error":          "SaaS 筛选错误：",
+        "saas_results_title":  "#### 护城河评分 Top {n} 公司",
+        "saas_legend":         "🟢 ≥ 30 强护城河  ·  🟡 22–29 中等  ·  🔴 < 22 弱",
+        "saas_detail_title":   "#### 详细分析",
+        "saas_sector_lbl":     "**行业：**",
+        "saas_ai_stance_lbl":  "**AI 立场：**",
+        "saas_ai_data_adv":    "**AI 数据优势：**",
+        "saas_ai_threat":      "**AI 威胁：**",
+        "saas_core_thesis":    "**核心逻辑：**",
+        "saas_key_risk":       "**主要风险：**",
+        "dist_label":          "分销",
+        "data_label":          "数据",
+        "integ_label":         "集成",
+        "reg_label":           "合规",
+    },
 }
+
+
+def t(key: str, **kwargs) -> str:
+    lang = st.session_state.get("ui_lang", "en")
+    val = _T.get(lang, _T["en"]).get(key) or _T["en"].get(key, key)
+    return val.format(**kwargs) if kwargs else val
+
+
+# ── Sections structure (uses translation keys for labels) ──────────────────────
+_SECTIONS = [
+    ("sec_analysts",  "1_analysts",  "bar-chart", [
+        ("market",       "sub_market"),
+        ("news",         "sub_news"),
+        ("fundamentals", "sub_fundamentals"),
+        ("valuation",    "sub_valuation"),
+        ("macro",        "sub_macro"),
+        ("sentiment",    "sub_sentiment"),
+        ("options",      "sub_options"),
+    ]),
+    ("sec_research",  "2_research",  "people", [
+        ("bull",    "sub_bull"),
+        ("bear",    "sub_bear"),
+        ("manager", "sub_manager"),
+    ]),
+    ("sec_trading",   "3_trading",   "graph-up-arrow", [
+        ("trader",  "sub_trader"),
+    ]),
+    ("sec_risk",      "4_risk",      "shield-exclamation", [
+        ("aggressive",   "sub_aggressive"),
+        ("conservative", "sub_conservative"),
+        ("neutral",      "sub_neutral"),
+    ]),
+    ("sec_portfolio", "5_portfolio", "clipboard-check", [
+        ("decision", "sub_decision"),
+    ]),
+]
+
 
 def _img_b64(name: str) -> str:
     p = Path(__file__).parent / "assets" / name
     return base64.b64encode(p.read_bytes()).decode() if p.exists() else ""
 
-_logo_b64     = _img_b64("Starluke.png")
-_desert_bg_b64 = _img_b64("Cominc3.png")
-_rock_bg_b64  = _img_b64("comic7.png")
-_light_bg_b64 = _img_b64("微信图片_20260424015903_165_2.jpg")
-_illus_b64    = _img_b64("1.png")
+_logo_b64        = _img_b64("Starluke.png")
+_desert_bg_b64   = _img_b64("Cominc3.png")
+_rock_bg_b64     = _img_b64("comic7.png")
+_light_bg_b64    = _img_b64("微信图片_20260424015903_165_2.jpg")
+_rainbow_bg_b64  = _img_b64("rainbow.png")
+_illus_b64       = _img_b64("1.png")
 
 # ── Page config ────────────────────────────────────────────────────────────────
 st.set_page_config(
@@ -84,7 +479,6 @@ ROCK_CSS = _COMMON_CSS + """
 html,body { background-color:#080808 !important; color:#f0f0f0 !important; }
 [data-testid="stAppViewContainer"],[data-testid="stMain"]
     { background-color:transparent !important; color:#f0f0f0 !important; }
-/* dark scrim over main content for readability */
 [data-testid="stMain"] { background-color:rgba(0,0,0,0.62) !important; }
 [data-testid="stSidebar"] { background-color:rgba(8,8,8,0.82) !important; border-right:1px solid #333 !important; padding-top:0 !important; }
 [data-testid="stTextInput"] input,[data-testid="stDateInput"] input
@@ -111,7 +505,6 @@ LIGHT_CSS = _COMMON_CSS + """
 html,body { background-color:#e8edf5 !important; color:#0a0a1e !important; }
 [data-testid="stAppViewContainer"],[data-testid="stMain"]
     { background-color:transparent !important; color:#0a0a1e !important; }
-/* light scrim for readability over bg image */
 [data-testid="stMain"] { background-color:rgba(240,244,252,0.72) !important; }
 [data-testid="stSidebar"] { background-color:rgba(255,255,255,0.88) !important; border-right:1px solid #d0d4e0 !important; padding-top:0 !important; box-shadow:2px 0 12px #0002; }
 [data-testid="stSidebar"] * { color:#1a1a2e !important; }
@@ -145,7 +538,6 @@ RAINBOW_CSS = _COMMON_CSS + """
 html,body { background-color:#090909 !important; color:#f0f0f0 !important; }
 [data-testid="stAppViewContainer"],[data-testid="stMain"]
     { background-color:transparent !important; color:#f0f0f0 !important; }
-/* dark scrim for readability */
 [data-testid="stMain"] { background-color:rgba(0,0,0,0.62) !important; }
 [data-testid="stSidebar"] { background-color:rgba(10,10,10,0.85) !important; border-right:1px solid #2a2a2a !important; padding-top:0 !important; }
 [data-testid="stSidebar"] img { animation:rglow 4s ease-in-out infinite; }
@@ -175,7 +567,6 @@ DESERT_CSS = _COMMON_CSS + """
 html,body { background-color:#f7ede0 !important; color:#2c1a08 !important; }
 [data-testid="stAppViewContainer"],[data-testid="stMain"]
     { background-color:transparent !important; color:#1a0a00 !important; }
-/* warm scrim over bg image */
 [data-testid="stMain"] { background-color:rgba(245,235,215,0.70) !important; }
 [data-testid="stSidebar"] { background-color:rgba(253,244,232,0.90) !important; border-right:1px solid #c8a97a !important; padding-top:0 !important; box-shadow:2px 0 10px #b8813030; }
 [data-testid="stSidebar"] * { color:#2c1a08 !important; }
@@ -218,24 +609,25 @@ def _save_prefs(**kwargs) -> None:
 _prefs = _load_prefs()
 
 # ── Session state ──────────────────────────────────────────────────────────────
-if "theme"         not in st.session_state: st.session_state.theme         = _prefs.get("theme", "rock")
-if "result"        not in st.session_state: st.session_state.result        = None
-if "running"       not in st.session_state: st.session_state.running       = False
-if "nav"           not in st.session_state: st.session_state.nav           = "New Analysis"
-if "username"      not in st.session_state: st.session_state.username      = _prefs.get("username", "")
-if "saas_results"  not in st.session_state: st.session_state.saas_results  = None
-if "saas_running"  not in st.session_state: st.session_state.saas_running  = False
+if "theme"        not in st.session_state: st.session_state.theme        = _prefs.get("theme", "rock")
+if "ui_lang"      not in st.session_state: st.session_state.ui_lang      = _prefs.get("ui_lang", "en")
+if "result"       not in st.session_state: st.session_state.result       = None
+if "running"      not in st.session_state: st.session_state.running      = False
+if "nav"          not in st.session_state: st.session_state.nav          = "New Analysis"
+if "username"     not in st.session_state: st.session_state.username     = _prefs.get("username", "")
+if "saas_results" not in st.session_state: st.session_state.saas_results = None
+if "saas_running" not in st.session_state: st.session_state.saas_running = False
 
 # Inject active theme
 _css_map = {"rock": ROCK_CSS, "light": LIGHT_CSS, "desert": DESERT_CSS, "rainbow": RAINBOW_CSS}
 st.markdown(f"<style>{_css_map[st.session_state.theme]}</style>", unsafe_allow_html=True)
 
-# Per-theme background image injection  (b64, mime, opacity)
+# Per-theme background image
 _theme_bg = {
     "rock":    (_rock_bg_b64,   "image/png",  "0.45"),
     "light":   (_light_bg_b64,  "image/jpeg", "0.35"),
     "desert":  (_desert_bg_b64, "image/png",  "0.40"),
-    "rainbow": (_desert_bg_b64, "image/png",  "0.15"),
+    "rainbow": (_rainbow_bg_b64, "image/png",  "0.45"),
 }
 _active_bg_b64, _active_bg_mime, _active_bg_opacity = _theme_bg.get(
     st.session_state.theme, (_desert_bg_b64, "image/png", "0.13")
@@ -265,8 +657,6 @@ if not st.session_state.username:
     st.markdown(f"""
     <style>
     [data-testid="stSidebar"] {{ display: none !important; }}
-
-    /* background fills full viewport at high opacity */
     html, body, [data-testid="stAppViewContainer"] {{
         background-image: {_wc_bg_url} !important;
         background-size: cover !important;
@@ -275,8 +665,6 @@ if not st.session_state.username:
         background-attachment: fixed !important;
         min-height: 100vh !important;
     }}
-
-    /* thin dark vignette — just enough for readability */
     [data-testid="stAppViewContainer"]::after {{
         content: "";
         position: fixed;
@@ -285,22 +673,14 @@ if not st.session_state.username:
         pointer-events: none;
         z-index: 0;
     }}
-
-    /* strip Streamlit's own background */
     [data-testid="stMain"],
-    [data-testid="stMain"] > div {{
-        background: transparent !important;
-    }}
-
-    /* center the card */
+    [data-testid="stMain"] > div {{ background: transparent !important; }}
     [data-testid="block-container"] {{
         padding-top: 10vh !important;
         max-width: 500px !important;
         position: relative;
         z-index: 1;
     }}
-
-    /* frosted glass card */
     [data-testid="block-container"] > div:first-child {{
         background: rgba(8, 12, 20, 0.55) !important;
         border: 1px solid rgba(255,255,255,0.13) !important;
@@ -310,49 +690,22 @@ if not st.session_state.username:
         -webkit-backdrop-filter: blur(16px) !important;
         box-shadow: 0 8px 48px rgba(0,0,0,0.5) !important;
     }}
-
-    .wc-logo {{
-        display: block;
-        width: 100%;
-        max-width: 460px;
-        margin: 0 auto 6px;
-        filter: drop-shadow(0 0 32px #36cfc977);
-    }}
-    .wc-sub {{
-        text-align: center;
-        font-size: 1.05rem;
-        letter-spacing: 4px;
-        text-transform: uppercase;
-        color: #ddd;
-        margin-bottom: 24px;
-        font-weight: 500;
-    }}
-    /* bigger label for the name input */
-    [data-testid="stTextInput"] label p {{
-        font-size: 1.25rem !important;
-        font-weight: 600 !important;
-        color: #eee !important;
-        letter-spacing: 1px !important;
-        margin-bottom: 6px !important;
-    }}
+    .wc-logo {{ display: block; width: 100%; max-width: 460px; margin: 0 auto 6px; filter: drop-shadow(0 0 32px #36cfc977); }}
+    .wc-sub {{ text-align: center; font-size: 1.05rem; letter-spacing: 4px; text-transform: uppercase; color: #ddd; margin-bottom: 24px; font-weight: 500; }}
+    [data-testid="stTextInput"] label p {{ font-size: 1.25rem !important; font-weight: 600 !important; color: #eee !important; letter-spacing: 1px !important; margin-bottom: 6px !important; }}
     </style>
     """, unsafe_allow_html=True)
 
     if _logo_b64:
-        st.markdown(
-            f'<img class="wc-logo" src="data:image/png;base64,{_logo_b64}" alt="STARLUKE">',
-            unsafe_allow_html=True,
-        )
-    st.markdown('<div class="wc-sub">Multi-Agent Stock Analysis</div>', unsafe_allow_html=True)
-    name_input = st.text_input("What's your name?", placeholder="Enter your name…", label_visibility="visible")
-    if st.button("Enter →", use_container_width=True, type="primary"):
+        st.markdown(f'<img class="wc-logo" src="data:image/png;base64,{_logo_b64}" alt="STARLUKE">', unsafe_allow_html=True)
+    st.markdown(f'<div class="wc-sub">{t("wc_sub")}</div>', unsafe_allow_html=True)
+    name_input = st.text_input(t("wc_name_label"), placeholder=t("wc_name_placeholder"), label_visibility="visible")
+    if st.button(t("wc_enter"), use_container_width=True, type="primary"):
         if name_input.strip():
             st.session_state.username = name_input.strip()
             _save_prefs(username=st.session_state.username)
             st.rerun()
     st.stop()
-
-
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
@@ -372,37 +725,7 @@ def _get_reports_dir() -> Path:
     except Exception:
         return Path("reports")
 
-_SECTIONS = [
-    ("I · Analysts",  "1_analysts",  "bar-chart", [
-        ("market",       "📈 Market"),
-        ("news",         "📰 News"),
-        ("fundamentals", "🏢 Fundamentals"),
-        ("valuation",    "🔢 Valuation"),
-        ("macro",        "🌐 Macro"),
-        ("sentiment",    "💬 Sentiment"),
-        ("options",      "💵 Options"),
-    ]),
-    ("II · Research", "2_research",  "people", [
-        ("bull",    "🟢 Bull"),
-        ("bear",    "🔴 Bear"),
-        ("manager", "👔 Research Mgr"),
-    ]),
-    ("III · Trading", "3_trading",   "graph-up-arrow", [
-        ("trader",  "🤝 Trader"),
-    ]),
-    ("IV · Risk",     "4_risk",      "shield-exclamation", [
-        ("aggressive",   "🔴 Aggressive"),
-        ("conservative", "🟢 Conservative"),
-        ("neutral",      "🟡 Neutral"),
-    ]),
-    ("V · Portfolio", "5_portfolio", "clipboard-check", [
-        ("decision", "🏆 Final Decision"),
-    ]),
-]
-
-
 def _read_signal_from_folder(base: Path) -> str:
-    """Extract BUY/HOLD/SELL from saved portfolio decision file."""
     dec = base / "5_portfolio" / "decision.md"
     if not dec.exists():
         return "—"
@@ -418,80 +741,71 @@ def _render_browse_reports():
     import shutil
     reports_dir = _get_reports_dir()
     if not reports_dir.exists():
-        st.info("No reports saved yet. Run an analysis first.")
+        st.info(t("no_reports"))
         return
     tickers = sorted([p.name for p in reports_dir.iterdir()
                       if p.is_dir() and p.name not in ("signal_log.csv", "saas_finder")])
     if not tickers:
-        st.info("No reports saved yet.")
+        st.info(t("no_reports2"))
         return
 
-    # ── Mode selector ──────────────────────────────────────────────────────────
+    _mode_labels = [t("mode_view"), t("mode_compare"), t("mode_delete")]
     mode = sac.segmented(
-        items=[sac.SegmentedItem(label="📄 View Report"),
-               sac.SegmentedItem(label="📊 Compare Dates"),
-               sac.SegmentedItem(label="🗑️ Delete")],
+        items=[sac.SegmentedItem(label=l) for l in _mode_labels],
         label=None, size="xs", color="#36cfc9",
     )
 
-    # ══════════════════════════════════════════════════════════════════════════
-    if mode == "🗑️ Delete":
-        st.warning("Select a report to permanently delete it.")
+    # ══ Delete ════════════════════════════════════════════════════════════════
+    if mode == t("mode_delete"):
+        st.warning(t("del_warn"))
         c1, c2 = st.columns([1, 1])
         with c1:
-            del_ticker = st.selectbox("Ticker", tickers, key="del_tick")
+            del_ticker = st.selectbox(t("del_ticker_lbl"), tickers, key="del_tick")
         ticker_dir = reports_dir / del_ticker
         dates = sorted([p.name for p in ticker_dir.iterdir() if p.is_dir()], reverse=True)
         if not dates:
-            st.info("No reports for this ticker.")
+            st.info(t("no_ticker_dates"))
             return
         with c2:
-            del_date = st.selectbox("Date", dates, key="del_date")
+            del_date = st.selectbox(t("del_date_lbl"), dates, key="del_date")
         target = ticker_dir / del_date
-        st.markdown(f"**Will delete:** `{target}`")
-        if st.button("🗑️ Confirm Delete", type="primary"):
+        st.markdown(f"{t('del_will')} `{target}`")
+        if st.button(t("del_confirm"), type="primary"):
             shutil.rmtree(target, ignore_errors=True)
-            # remove ticker folder too if now empty
             remaining = [p for p in ticker_dir.iterdir() if p.is_dir()]
             if not remaining:
                 ticker_dir.rmdir()
-            st.success(f"Deleted {del_ticker} / {del_date}")
+            st.success(t("del_success", ticker=del_ticker, date=del_date))
             st.rerun()
         return
 
-    # ══════════════════════════════════════════════════════════════════════════
-    if mode == "📊 Compare Dates":
+    # ══ Compare Dates ══════════════════════════════════════════════════════════
+    if mode == t("mode_compare"):
         import json as _json, subprocess as _sp
 
         c1, c2 = st.columns([1, 2])
         with c1:
-            cmp_ticker = st.selectbox("Ticker", tickers, key="cmp_tick")
+            cmp_ticker = st.selectbox(t("del_ticker_lbl"), tickers, key="cmp_tick")
         ticker_dir = reports_dir / cmp_ticker
         dates = sorted([p.name for p in ticker_dir.iterdir() if p.is_dir()], reverse=True)
         if len(dates) < 2:
-            st.info("Need at least 2 saved dates for the same ticker to compare.")
+            st.info(t("cmp_need2"))
             return
         with c2:
-            cmp_dates = st.multiselect("Select dates to compare", dates,
-                                       default=dates[:min(4, len(dates))])
+            cmp_dates = st.multiselect(t("cmp_select"), dates, default=dates[:min(4, len(dates))])
         if not cmp_dates:
             return
 
         sorted_dates = sorted(cmp_dates)
-
-        # Load summaries (never full reports)
         summaries = {}
         for d in sorted_dates:
             sj = ticker_dir / d / "summary.json"
             if sj.exists():
                 summaries[d] = _json.loads(sj.read_text(encoding="utf-8"))
             else:
-                # fallback: derive signal from decision.md only
-                summaries[d] = {"date": d, "signal": _read_signal_from_folder(ticker_dir / d),
-                                 "_no_summary": True}
+                summaries[d] = {"date": d, "signal": _read_signal_from_folder(ticker_dir / d), "_no_summary": True}
 
-        # ── Signal timeline ────────────────────────────────────────────────────
-        st.markdown("#### Signal Timeline")
+        st.markdown(t("signal_timeline"))
         sig_cols = st.columns(len(sorted_dates))
         _sig_icon = {"BUY": "🟢", "SELL": "🔴", "HOLD": "🟡"}
         for i, d in enumerate(sorted_dates):
@@ -499,23 +813,17 @@ def _render_browse_reports():
             sig_cols[i].metric(d, f"{_sig_icon.get(sig, '')} {sig}")
 
         st.divider()
-
-        # ── Structured diff table (from summaries only) ────────────────────────
-        st.markdown("#### Key Points by Date")
+        st.markdown(t("key_points"))
         _COMPARE_FIELDS = [
-            ("bull_thesis",       "🟢 Bull Thesis"),
-            ("bear_thesis",       "🔴 Bear Thesis"),
-            ("trader_plan",       "🤝 Trader Plan"),
-            ("final_decision",    "🏆 PM Decision"),
-            ("analysts.market",   "📈 Market"),
-            ("analysts.news",     "📰 News"),
+            ("bull_thesis",           "🟢 Bull Thesis"),
+            ("bear_thesis",           "🔴 Bear Thesis"),
+            ("trader_plan",           "🤝 Trader Plan"),
+            ("final_decision",        "🏆 PM Decision"),
+            ("analysts.market",       "📈 Market"),
+            ("analysts.news",         "📰 News"),
             ("analysts.fundamentals", "🏢 Fundamentals"),
         ]
-        field_choice = st.selectbox(
-            "Field to compare",
-            [label for _, label in _COMPARE_FIELDS],
-            key="cmp_field",
-        )
+        field_choice = st.selectbox(t("field_compare"), [label for _, label in _COMPARE_FIELDS], key="cmp_field")
         chosen_key = next(k for k, l in _COMPARE_FIELDS if l == field_choice)
 
         def _get_field(s: dict, key: str) -> str:
@@ -529,19 +837,16 @@ def _render_browse_reports():
             with cols[i]:
                 st.markdown(f"**{d}**")
                 if summaries[d].get("_no_summary"):
-                    st.caption("No summary.json — re-run analysis to generate")
+                    st.caption(t("no_summary"))
                 else:
                     val = _get_field(summaries[d], chosen_key)
                     st.markdown(val or "_empty_")
 
         st.divider()
+        st.markdown(t("ai_compare"))
+        st.caption(t("ai_compare_cap"))
 
-        # ── AI comparison (summaries only → tiny prompt) ───────────────────────
-        st.markdown("#### 🤖 AI Comparison")
-        st.caption("Sends only the extracted summaries (~2 KB) — not the full reports.")
-
-        if st.button("Compare with Claude", type="primary"):
-            # Build compact prompt from summaries
+        if st.button(t("compare_btn"), type="primary"):
             blocks = []
             for d in sorted_dates:
                 s = summaries[d]
@@ -557,7 +862,6 @@ def _render_browse_reports():
                     f"Market: {s.get('analysts',{}).get('market','')}\n"
                     f"Fundamentals: {s.get('analysts',{}).get('fundamentals','')}"
                 )
-
             prompt = (
                 f"You are a financial analyst. Compare these {len(sorted_dates)} analyses "
                 f"of {cmp_ticker} across different dates.\n\n"
@@ -570,12 +874,11 @@ def _render_browse_reports():
                 "4. What is the trend — improving, deteriorating, or stable?\n"
                 "Keep your response under 400 words."
             )
-
-            with st.spinner("Comparing with Claude…"):
+            with st.spinner(t("comparing")):
                 try:
+                    from tradingagents.llm_clients.claude_cli_client import find_claude_exe
                     proc = _sp.Popen(
-                        ["claude", "--output-format", "text",
-                         "--dangerously-skip-permissions", "-p", prompt],
+                        [find_claude_exe(), "--output-format", "text", "--dangerously-skip-permissions", "-p", prompt],
                         stdout=_sp.PIPE, stderr=_sp.PIPE,
                         stdin=_sp.DEVNULL, encoding="utf-8", errors="replace",
                     )
@@ -588,41 +891,38 @@ def _render_browse_reports():
                     st.error(f"Failed: {e}")
         return
 
-    # ══════════════════════════════════════════════════════════════════════════
-    # Default: View Report
+    # ══ View Report ════════════════════════════════════════════════════════════
     c1, c2 = st.columns([1, 1])
     with c1:
-        selected_ticker = st.selectbox("Ticker", tickers)
+        selected_ticker = st.selectbox(t("del_ticker_lbl"), tickers)
     ticker_dir = reports_dir / selected_ticker
     dates = sorted([p.name for p in ticker_dir.iterdir() if p.is_dir()], reverse=True)
     if not dates:
-        st.info(f"No reports for {selected_ticker}.")
+        st.info(t("no_ticker_reports", ticker=selected_ticker))
         return
     with c2:
-        selected_date = st.selectbox("Date", dates)
+        selected_date = st.selectbox(t("del_date_lbl"), dates)
 
-    # overwrite notice
-    st.caption(
-        f"💡 Re-running **{selected_ticker}** on **{selected_date}** will overwrite this report. "
-        "Use a different date to keep both."
-    )
+    st.caption(t("overwrite_notice", ticker=selected_ticker, date=selected_date))
 
     base = ticker_dir / selected_date
+
+    # Build translated section labels
+    sec_labels = [t(sk) for sk, _, _, _ in _SECTIONS]
     section_tab = sac.tabs(
-        [sac.TabsItem(label, icon=icon) for label, _, icon, _ in _SECTIONS],
+        [sac.TabsItem(lbl, icon=icon) for lbl, (_, _, icon, _) in zip(sec_labels, _SECTIONS)],
         color="#36cfc9", size="sm", align="start",
     )
-    for label, folder, _, files in _SECTIONS:
-        if section_tab != label:
+    for (sk, folder, _, files), lbl in zip(_SECTIONS, sec_labels):
+        if section_tab != lbl:
             continue
         section_dir = base / folder
         if not section_dir.exists():
-            st.info(f"No data for {label}.")
+            st.info(t("no_data_label", label=lbl))
             break
-        available = [(stem, title) for stem, title in files
-                     if (section_dir / f"{stem}.md").exists()]
+        available = [(stem, t(tk)) for stem, tk in files if (section_dir / f"{stem}.md").exists()]
         if not available:
-            st.info("No files saved for this section.")
+            st.info(t("no_files"))
             break
         if len(available) == 1:
             st.markdown((section_dir / f"{available[0][0]}.md").read_text(encoding="utf-8"))
@@ -637,70 +937,62 @@ def _render_browse_reports():
                     break
         break
 
+
 def _render_signal_log():
     import pandas as pd
     log_path = _get_reports_dir() / "signal_log.csv"
     if not log_path.exists():
-        st.info("No signals logged yet. Signal log is created after your first analysis.")
+        st.info(t("no_signals"))
         return
     try:
         df = pd.read_csv(log_path)
         if df.empty:
-            st.info("Signal log is empty.")
+            st.info(t("log_empty"))
             return
         def color_signal(val):
             if val == "BUY":  return "color:#00e676;font-weight:bold"
             if val == "SELL": return "color:#ff1744;font-weight:bold"
             return "color:#ffb800;font-weight:bold"
-        st.dataframe(df.style.map(color_signal, subset=["signal"]),
-                     use_container_width=True)
+        st.dataframe(df.style.map(color_signal, subset=["signal"]), width="stretch")
         c1, c2, c3, c4 = st.columns(4)
-        c1.metric("Total",  len(df))
+        c1.metric(t("log_total"), len(df))
         c2.metric("BUY",  int((df.signal == "BUY").sum()))
         c3.metric("SELL", int((df.signal == "SELL").sum()))
         c4.metric("HOLD", int((df.signal == "HOLD").sum()))
     except Exception as e:
-        st.error(f"Could not read signal log: {e}")
+        st.error(f"{t('log_error')} {e}")
+
 
 def _render_saas_finder_page():
-    st.markdown("### 🔍 SaaS Finder — 护城河四维度 Moat Scanner")
-    st.caption(
-        "Uses Claude to identify publicly-traded SaaS companies with the strongest moats "
-        "across four dimensions: Distribution · Proprietary Data · Integration · Regulatory."
-    )
+    st.markdown(t("saas_title"))
+    st.caption(t("saas_caption"))
+
+    with st.expander(t("saas_how_title"), expanded=True):
+        st.markdown(t("saas_explanation"))
 
     with st.form("saas_finder_form"):
         col1, col2 = st.columns([2, 3])
         with col1:
-            n = st.slider("Number of companies", min_value=1, max_value=15, value=5)
+            n = st.slider(t("saas_n_label"), min_value=1, max_value=15, value=5)
         with col2:
-            sector_hint = st.text_input(
-                "Sector filter (optional)",
-                placeholder="e.g. Fintech, HR-Tech, DevOps, Healthcare",
-            )
-        submitted = st.form_submit_button("🔍 Find SaaS Moats", type="primary", use_container_width=True)
+            sector_hint = st.text_input(t("saas_sector_label"), placeholder=t("saas_sector_ph"))
+        submitted = st.form_submit_button(t("saas_submit"), type="primary", use_container_width=True)
 
     if submitted and not st.session_state.saas_running:
         st.session_state.saas_results = None
         st.session_state.saas_running = True
         status_box = st.empty()
-        messages = []
 
         def _cb(msg: str):
-            messages.append(msg)
-            status_box.info("  \n".join(messages))
+            status_box.info(msg)
 
         try:
             from tradingagents.saas_finder import run_saas_finder
-            with st.spinner("Running SaaS Finder analysis… (may take 1–2 min)"):
-                results = run_saas_finder(
-                    n=n,
-                    sector_hint=sector_hint.strip(),
-                    progress_cb=_cb,
-                )
+            with st.spinner(t("saas_spinner")):
+                results = run_saas_finder(n=n, sector_hint=sector_hint.strip(), progress_cb=_cb)
             st.session_state.saas_results = results
         except Exception as e:
-            st.error(f"SaaS Finder error: {e}")
+            st.error(f"{t('saas_error')} {e}")
         finally:
             st.session_state.saas_running = False
             status_box.empty()
@@ -709,20 +1001,21 @@ def _render_saas_finder_page():
     if results:
         import pandas as pd
 
-        st.markdown(f"#### Top {len(results)} Companies by Moat Score")
+        st.markdown(t("saas_results_title", n=len(results)))
+        st.caption(t("saas_legend"))
 
         rows = []
         for r in results:
             rows.append({
-                "Ticker":       r.get("ticker", "?"),
-                "Company":      r.get("company", "?"),
-                "Sector":       r.get("sector", "?"),
-                "Distribution": r.get("moat_distribution", 0),
-                "Data":         r.get("moat_data", 0),
-                "Integration":  r.get("moat_integration", 0),
-                "Regulatory":   r.get("moat_regulatory", 0),
-                "Total /40":    r.get("moat_total", 0),
-                "AI Stance":    r.get("ai_stance", "?"),
+                "Ticker":          r.get("ticker", "?"),
+                "Company":         r.get("company", "?"),
+                "Sector":          r.get("sector", "?"),
+                t("dist_label"):   r.get("moat_distribution", 0),
+                t("data_label"):   r.get("moat_data", 0),
+                t("integ_label"):  r.get("moat_integration", 0),
+                t("reg_label"):    r.get("moat_regulatory", 0),
+                "Total /40":       r.get("moat_total", 0),
+                "AI Stance":       r.get("ai_stance", "?"),
             })
         df = pd.DataFrame(rows)
 
@@ -733,31 +1026,27 @@ def _render_saas_finder_page():
                 return "color:#ff5252"
             return ""
 
-        st.dataframe(
-            df.style.map(_color_total, subset=["Total /40"]),
-            use_container_width=True,
-        )
+        st.dataframe(df.style.map(_color_total, subset=["Total /40"]), width="stretch")
 
         st.divider()
-        st.markdown("#### Detailed Analysis")
+        st.markdown(t("saas_detail_title"))
         for r in results:
             with st.expander(f"**{r.get('ticker','?')}** — {r.get('company','?')} (Total: {r.get('moat_total',0)}/40)"):
                 c1, c2, c3, c4 = st.columns(4)
-                c1.metric("Distribution",  f"{r.get('moat_distribution', 0)}/10")
-                c2.metric("Data",          f"{r.get('moat_data', 0)}/10")
-                c3.metric("Integration",   f"{r.get('moat_integration', 0)}/10")
-                c4.metric("Regulatory",    f"{r.get('moat_regulatory', 0)}/10")
-
-                st.markdown(f"**Sector:** {r.get('sector','?')}  |  **AI Stance:** {r.get('ai_stance','?')}")
-                st.markdown(f"**AI Data Advantage:** {r.get('ai_data_advantage','?')}  |  **AI Threat:** {r.get('ai_threat','?')}")
-                st.info(f"**Core Thesis:** {r.get('core_thesis','?')}")
-                st.warning(f"**Key Risk:** {r.get('key_risk','?')}")
+                c1.metric(t("dist_label"),  f"{r.get('moat_distribution', 0)}/10")
+                c2.metric(t("data_label"),  f"{r.get('moat_data', 0)}/10")
+                c3.metric(t("integ_label"), f"{r.get('moat_integration', 0)}/10")
+                c4.metric(t("reg_label"),   f"{r.get('moat_regulatory', 0)}/10")
+                st.markdown(f"{t('saas_sector_lbl')} {r.get('sector','?')}  |  {t('saas_ai_stance_lbl')} {r.get('ai_stance','?')}")
+                st.markdown(f"{t('saas_ai_data_adv')} {r.get('ai_data_advantage','?')}  |  {t('saas_ai_threat')} {r.get('ai_threat','?')}")
+                st.info(f"{t('saas_core_thesis')} {r.get('core_thesis','?')}")
+                st.warning(f"{t('saas_key_risk')} {r.get('key_risk','?')}")
 
 
 def run_analysis(ticker, trade_date, analysts,
                  quick_model="claude-cli", deep_model="claude-cli",
                  output_language="English", depth_cfg=None):
-    depth_cfg = depth_cfg or {"max_debate_rounds": 1, "max_risk_discuss_rounds": 1}
+    depth_cfg = depth_cfg or _DEPTH_CFG[1]
 
     def _progress_cb(node_name: str):
         label = _NODE_LABELS.get(node_name, node_name)
@@ -802,24 +1091,22 @@ def run_analysis(ticker, trade_date, analysts,
 
 # ── SIDEBAR ────────────────────────────────────────────────────────────────────
 with st.sidebar:
-    # Logo
     if _logo_b64:
         st.markdown(f"""
         <div class="logo-wrap">
             <img src="data:image/png;base64,{_logo_b64}" alt="STARLUKE">
-            <div class="logo-sub">Powered by Claude CLI</div>
+            <div class="logo-sub">{t("logo_sub")}</div>
         </div>
         """, unsafe_allow_html=True)
 
-    # Greeting — big name display
     st.markdown(
         f"<div style='text-align:center;padding:8px 0 4px;'>"
-        f"<div style='font-size:0.75rem;color:#888;letter-spacing:2px;text-transform:uppercase;margin-bottom:2px;'>Welcome back</div>"
+        f"<div style='font-size:0.75rem;color:#888;letter-spacing:2px;text-transform:uppercase;margin-bottom:2px;'>{t('welcome_back')}</div>"
         f"<div style='font-size:1.35rem;font-weight:700;color:#36cfc9;'>{st.session_state.username}</div>"
         f"</div>",
         unsafe_allow_html=True,
     )
-    if st.button("✏️ Change Name", use_container_width=True, key="change_name_btn"):
+    if st.button(t("change_name"), use_container_width=True, key="change_name_btn"):
         st.session_state.username = ""
         _save_prefs(username="")
         st.rerun()
@@ -841,40 +1128,60 @@ with st.sidebar:
         _save_prefs(theme=st.session_state.theme)
         st.rerun()
 
-    # Navigation menu
-    nav = sac.menu([
-        sac.MenuItem("New Analysis",   icon="rocket-takeoff"),
-        sac.MenuItem("SaaS Finder",    icon="search"),
-        sac.MenuItem("Browse Reports", icon="folder2-open"),
-        sac.MenuItem("Signal Log",     icon="bar-chart-line"),
-    ], color="#36cfc9", size="sm", indent=16, open_all=True)
-    if nav: st.session_state.nav = nav
+    # UI Language toggle
+    sac.divider(label=t("div_ui_lang"), align="center", color="#333")
+    lang_ui_choice = sac.segmented(
+        items=[sac.SegmentedItem(label="🇺🇸 EN"), sac.SegmentedItem(label="🇨🇳 中文")],
+        label=None, size="xs", color="#36cfc9", use_container_width=True,
+        index=0 if st.session_state.ui_lang == "en" else 1,
+    )
+    _new_ui_lang = "zh" if lang_ui_choice == "🇨🇳 中文" else "en"
+    if _new_ui_lang != st.session_state.ui_lang:
+        st.session_state.ui_lang = _new_ui_lang
+        _save_prefs(ui_lang=_new_ui_lang)
+        st.rerun()
 
-    sac.divider(label="Configuration", align="center", color="#333")
+    # Navigation menu
+    _NAV_EN    = ["New Analysis", "SaaS Finder", "Browse Reports", "Signal Log"]
+    _NAV_ICONS = ["rocket-takeoff", "search", "folder2-open", "bar-chart-line"]
+    _nav_labels = [t("nav_new"), t("nav_saas"), t("nav_browse"), t("nav_log")]
+    nav = sac.menu([
+        sac.MenuItem(lbl, icon=icon)
+        for lbl, icon in zip(_nav_labels, _NAV_ICONS)
+    ], color="#36cfc9", size="sm", indent=16, open_all=True)
+    if nav:
+        try:
+            st.session_state.nav = _NAV_EN[_nav_labels.index(nav)]
+        except ValueError:
+            pass
+
+    sac.divider(label=t("div_config"), align="center", color="#333")
 
     ticker = st.text_input(
-        "Stock Ticker", value="AAPL", placeholder="e.g. NVDA, TSLA, 0700.HK"
+        t("ticker_label"), value="AAPL", placeholder=t("ticker_placeholder")
     ).upper().strip()
 
+    # Default to last weekday (skip Saturday → Friday, Sunday → Friday)
+    _yesterday = date.today() - timedelta(days=1)
+    _default_date = _yesterday - timedelta(days=max(0, _yesterday.weekday() - 4))
     trade_date = st.date_input(
-        "Analysis Date",
-        value=date.today() - timedelta(days=1),
+        t("date_label"),
+        value=_default_date,
         max_value=date.today(),
     )
+    if trade_date.weekday() >= 5:
+        st.warning("⚠️ Weekend — markets closed. No price data available. Select a weekday." if st.session_state.ui_lang == "en"
+                   else "⚠️ 周末市场休市，无行情数据，请选择工作日。")
 
-    sac.divider(label="Analysts", align="center", color="#333")
+    sac.divider(label=t("div_analysts"), align="center", color="#333")
 
-    use_market       = st.checkbox("Market (Technical)",      value=True)
-    use_news         = st.checkbox("News",                    value=True)
-    use_fundamentals = st.checkbox("Fundamentals",            value=True)
-    use_valuation    = st.checkbox("Valuation & Peers",       value=True,
-                                   help="Peer P/E, EV/EBITDA comparison")
-    use_macro        = st.checkbox("Macro (Fed/CPI/Yield)",   value=True,
-                                   help="Cached 7 days — very fast on repeats")
-    use_social       = st.checkbox("Social (= News data)",    value=False,
-                                   help="yfinance doesn't have Reddit/Twitter data")
-    use_options      = st.checkbox("Options (LEAP vs Stock)", value=False,
-                                   help="Fetches yfinance options chain, recommends LEAP vs buying stock")
+    use_market       = st.checkbox(t("cb_market"),       value=True)
+    use_news         = st.checkbox(t("cb_news"),         value=True)
+    use_fundamentals = st.checkbox(t("cb_fundamentals"), value=True)
+    use_valuation    = st.checkbox(t("cb_valuation"),    value=True,  help=t("cb_valuation_help"))
+    use_macro        = st.checkbox(t("cb_macro"),        value=True,  help=t("cb_macro_help"))
+    use_social       = st.checkbox(t("cb_social"),       value=False, help=t("cb_social_help"))
+    use_options      = st.checkbox(t("cb_options"),      value=False, help=t("cb_options_help"))
 
     selected_analysts = (
         (["market"]       if use_market       else []) +
@@ -886,37 +1193,28 @@ with st.sidebar:
         (["options"]      if use_options      else [])
     )
 
-    sac.divider(label="Depth", align="center", color="#333")
+    sac.divider(label=t("div_depth"), align="center", color="#333")
+    _depth_labels = [t("depth_0"), t("depth_1"), t("depth_2")]
     depth_choice = sac.segmented(
-        items=[
-            sac.SegmentedItem(label="⚡ Shallow"),
-            sac.SegmentedItem(label="⚖️ Standard"),
-            sac.SegmentedItem(label="🔬 Deep"),
-        ],
+        items=[sac.SegmentedItem(label=l) for l in _depth_labels],
         label=None, size="xs", color="#36cfc9", use_container_width=True,
         index=1,
     )
-    _depth_key = depth_choice or "⚖️ Standard"
-    selected_depth_cfg = _DEPTH_CFG.get(_depth_key, _DEPTH_CFG["⚖️ Standard"])
-    _depth_hint = {"⚡ Shallow": "1 debate · 1 risk round",
-                   "⚖️ Standard": "1 debate · 2 risk rounds",
-                   "🔬 Deep": "2 debates · 3 risk rounds"}
-    st.caption(_depth_hint.get(_depth_key, ""))
+    depth_idx = _depth_labels.index(depth_choice) if depth_choice in _depth_labels else 1
+    selected_depth_cfg = _DEPTH_CFG[depth_idx]
+    st.caption(t(f"depth_hint_{depth_idx}"))
 
-    sac.divider(label="Model", align="center", color="#333")
+    sac.divider(label=t("div_model"), align="center", color="#333")
 
     from tradingagents.llm_clients.model_catalog import get_model_options
     _qopts = get_model_options("claude_cli", "quick")
     _dopts = get_model_options("claude_cli", "deep")
-    quick_model = dict(_qopts)[st.selectbox("Quick (analysts)", [l for l,_ in _qopts], index=0)]
-    deep_model  = dict(_dopts)[st.selectbox("Deep (PM & research)", [l for l,_ in _dopts], index=0)]
+    quick_model = dict(_qopts)[st.selectbox(t("model_quick"), [l for l,_ in _qopts], index=0)]
+    deep_model  = dict(_dopts)[st.selectbox(t("model_deep"),  [l for l,_ in _dopts], index=0)]
 
-    sac.divider(label="Language", align="center", color="#333")
+    sac.divider(label=t("div_lang"), align="center", color="#333")
     lang_choice = sac.segmented(
-        items=[
-            sac.SegmentedItem(label="🇺🇸 English"),
-            sac.SegmentedItem(label="🇨🇳 中文"),
-        ],
+        items=[sac.SegmentedItem(label="🇺🇸 English"), sac.SegmentedItem(label="🇨🇳 中文")],
         label=None, size="xs", color="#36cfc9", use_container_width=True,
         index=0,
     )
@@ -925,18 +1223,25 @@ with st.sidebar:
     st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
 
     run_btn = st.button(
-        "🚀  Run Analysis", use_container_width=True, type="primary",
+        t("run_btn"), use_container_width=True, type="primary",
         disabled=not ticker or not selected_analysts or st.session_state.running,
     )
     if not selected_analysts:
-        st.warning("Select at least one analyst.")
+        st.warning(t("no_analyst_warn"))
+
+    if st.session_state.running:
+        if st.button("⏹ Stop / 强制停止", use_container_width=True):
+            with _RUN_LOCK:
+                _RUN["done"] = True
+                _RUN["result"] = {"error": "Cancelled by user.", "state": None}
+            st.session_state.running = False
+            st.rerun()
 
     st.markdown("<div style='height:4px'></div>", unsafe_allow_html=True)
-    st.caption("💡 First run ~3–5 min · Results auto-saved to reports/")
+    st.caption(t("run_hint"))
 
 
 # ── MAIN AREA ──────────────────────────────────────────────────────────────────
-# Hero banner — theme-aware background
 if _logo_b64:
     _banner_bg = {
         "rock":    "linear-gradient(160deg, #050a10 0%, #0c1826 50%, #050a10 100%)",
@@ -955,37 +1260,19 @@ if _logo_b64:
     st.markdown(f"""
     <style>
     .hero-banner {{
-        position: relative;
-        width: 100%;
-        border-radius: 16px;
-        overflow: hidden;
-        margin-bottom: 28px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        min-height: 220px;
-        background: {_banner_bg};
-        border: 1px solid var(--sl-border);
+        position: relative; width: 100%; border-radius: 16px; overflow: hidden;
+        margin-bottom: 28px; display: flex; align-items: center; justify-content: center;
+        min-height: 220px; background: {_banner_bg}; border: 1px solid var(--sl-border);
     }}
     .hero-banner::before {{
-        content: "";
-        position: absolute;
-        inset: 0;
+        content: ""; position: absolute; inset: 0;
         background-image: url("data:image/png;base64,{_logo_b64}");
-        background-size: 55%;
-        background-repeat: no-repeat;
-        background-position: center;
-        opacity: 0.07;
-        filter: blur(1px);
+        background-size: 55%; background-repeat: no-repeat; background-position: center;
+        opacity: 0.07; filter: blur(1px);
     }}
     .hero-banner img {{
-        position: relative;
-        z-index: 1;
-        width: 62%;
-        max-width: 740px;
-        min-width: 280px;
-        height: auto;
-        mix-blend-mode: {_banner_blend};
+        position: relative; z-index: 1; width: 62%; max-width: 740px; min-width: 280px;
+        height: auto; mix-blend-mode: {_banner_blend};
         filter: {_banner_glow} brightness(1.05);
     }}
     </style>
@@ -999,16 +1286,16 @@ if run_btn and not st.session_state.running:
     _n_analysts = len(selected_analysts)
     _dr = selected_depth_cfg.get("max_debate_rounds", 1)
     _rr = selected_depth_cfg.get("max_risk_discuss_rounds", 1)
-    _total = _n_analysts + 2 * _dr + 1 + 1 + 3 * _rr + 1   # analysts+debate+trader+risk+PM
+    _total = _n_analysts + 2 * _dr + 1 + 1 + 3 * _rr + 1
     with _RUN_LOCK:
         _RUN.update({"active": True, "progress": [], "result": None, "done": False, "error": None})
-    st.session_state.result        = None
-    st.session_state.running       = True
-    st.session_state.nav           = "New Analysis"
-    st.session_state._run_ticker   = ticker
-    st.session_state._run_date     = str(trade_date)
-    st.session_state._run_total    = _total
-    st.session_state._run_started  = time.time()
+    st.session_state.result       = None
+    st.session_state.running      = True
+    st.session_state.nav          = "New Analysis"
+    st.session_state._run_ticker  = ticker
+    st.session_state._run_date    = str(trade_date)
+    st.session_state._run_total   = _total
+    st.session_state._run_started = time.time()
     threading.Thread(
         target=run_analysis,
         args=(ticker, trade_date, selected_analysts, quick_model, deep_model,
@@ -1017,7 +1304,7 @@ if run_btn and not st.session_state.running:
     ).start()
     st.rerun()
 
-# ── Poll for completion ─────────────────────────────────────────────────────────
+# ── Poll for completion ────────────────────────────────────────────────────────
 if st.session_state.running:
     with _RUN_LOCK:
         _done   = _RUN["done"]
@@ -1031,11 +1318,11 @@ if st.session_state.running:
 page = st.session_state.nav
 
 if page == "Browse Reports":
-    st.markdown("### 📂 Browse Reports")
+    st.markdown(t("browse_title"))
     _render_browse_reports()
 
 elif page == "Signal Log":
-    st.markdown("### 📊 Signal Log")
+    st.markdown(t("log_title"))
     _render_signal_log()
 
 elif page == "SaaS Finder":
@@ -1046,9 +1333,8 @@ else:
     result = st.session_state.result
 
     if st.session_state.running:
-        # ── Live progress display ──────────────────────────────────────────────
         with _RUN_LOCK:
-            _prog  = list(_RUN["progress"])
+            _prog = list(_RUN["progress"])
         _total   = st.session_state.get("_run_total", 15)
         _ticker  = st.session_state.get("_run_ticker", "")
         _rdate   = st.session_state.get("_run_date", "")
@@ -1056,21 +1342,19 @@ else:
         _mins, _secs = divmod(_elapsed, 60)
 
         st.markdown(
-            f"<h3 style='margin-bottom:4px;'>⏳ Analyzing <span style='color:#36cfc9'>{_ticker}</span>"
+            f"<h3 style='margin-bottom:4px;'>⏳ {t('analyzing')} <span style='color:#36cfc9'>{_ticker}</span>"
             f" &nbsp;·&nbsp; {_rdate}</h3>"
             f"<div style='color:var(--sl-muted);font-size:0.85rem;margin-bottom:16px;'>"
-            f"Elapsed: {_mins:02d}:{_secs:02d} &nbsp;·&nbsp; {len(_prog)}/{_total} steps</div>",
+            f"{t('elapsed')}: {_mins:02d}:{_secs:02d} &nbsp;·&nbsp; {len(_prog)}/{_total} {t('steps')}</div>",
             unsafe_allow_html=True,
         )
         st.progress(min(len(_prog) / max(_total, 1), 0.99))
 
         if _prog:
-            # Completed steps
             _done_html = "".join(
                 f"<div style='padding:3px 0;font-size:0.88rem;'>✅ {s}</div>"
                 for s in _prog[:-1]
             )
-            # Current (last) step — animated
             _done_html += (
                 f"<div style='padding:4px 0;font-size:0.92rem;font-weight:600;"
                 f"color:#36cfc9;'>⚙️ {_prog[-1]} &nbsp;<span style='opacity:0.6;font-size:0.8rem;'>running…</span></div>"
@@ -1081,18 +1365,13 @@ else:
                 unsafe_allow_html=True,
             )
         else:
-            st.markdown(
-                "<div style='color:var(--sl-muted);font-size:0.88rem;'>Initializing agents…</div>",
-                unsafe_allow_html=True,
-            )
+            st.markdown(f"<div style='color:var(--sl-muted);font-size:0.88rem;'>{t('initializing')}</div>", unsafe_allow_html=True)
 
         time.sleep(2)
         st.rerun()
 
     elif result is None:
-        # Landing — one row: illustration | How it works | Agent pipeline
-        st.info("Configure your analysis in the sidebar and click **Run Analysis**.")
-
+        st.info(t("landing_info"))
         col_img, col_how, col_pipe = st.columns([1.5, 1, 1])
 
         with col_img:
@@ -1104,18 +1383,12 @@ else:
                 """, unsafe_allow_html=True)
 
         with col_how:
-            st.markdown("""
-#### How it works
-1. **Analysts** pull live market data
-2. **Bull & Bear** debate the thesis
-3. **Trader** builds a trade proposal
-4. **Risk team** stress-tests sizing
-5. **Portfolio Manager** → BUY / HOLD / SELL
-            """)
+            st.markdown(t("how_it_works"))
+            st.markdown(t("how_steps"))
 
         with col_pipe:
-            st.markdown("""
-#### Agent pipeline
+            st.markdown(t("agent_pipeline"))
+            st.markdown("""\
 ```
 Market  ┐
 News    ├→ Bull/Bear
@@ -1128,11 +1401,10 @@ Macro   ┘  Res. Mgr
               ↓
         Port. Mgr
            VERDICT
-```
-            """)
+```""")
 
     elif result.get("error"):
-        st.error(f"Analysis failed: {result['error']}")
+        st.error(f"{t('analysis_failed')} {result['error']}")
 
     else:
         state  = result["state"]
@@ -1146,60 +1418,49 @@ Macro   ┘  Res. Mgr
         st.markdown(f"""
         <div class="sig-banner {sig_cls}">
             {sig_ico}&nbsp; {ticker_label} — {signal}
-            <div class="sig-sub">Analysis date: {date_label}</div>
+            <div class="sig-sub">{t('analysis_date')} {date_label}</div>
         </div>
         """, unsafe_allow_html=True)
 
-        # Results tabs
         tab = sac.tabs([
-            sac.TabsItem("Final Decision",    icon="clipboard-check"),
-            sac.TabsItem("Trader Plan",       icon="graph-up-arrow"),
-            sac.TabsItem("Research Manager",  icon="people"),
-            sac.TabsItem("Market",            icon="bar-chart"),
-            sac.TabsItem("News",              icon="newspaper"),
-            sac.TabsItem("Fundamentals",      icon="building"),
-            sac.TabsItem("Valuation",         icon="calculator"),
-            sac.TabsItem("Macro",             icon="globe"),
-            sac.TabsItem("Options",           icon="currency-dollar"),
-            sac.TabsItem("Sentiment",         icon="chat-square-text"),
-            sac.TabsItem("Risk Debate",       icon="shield-exclamation"),
+            sac.TabsItem(t("tab_final"),        icon="clipboard-check"),
+            sac.TabsItem(t("tab_trader"),        icon="graph-up-arrow"),
+            sac.TabsItem(t("tab_research"),      icon="people"),
+            sac.TabsItem(t("tab_market"),        icon="bar-chart"),
+            sac.TabsItem(t("tab_news"),          icon="newspaper"),
+            sac.TabsItem(t("tab_fundamentals"),  icon="building"),
+            sac.TabsItem(t("tab_valuation"),     icon="calculator"),
+            sac.TabsItem(t("tab_macro"),         icon="globe"),
+            sac.TabsItem(t("tab_options"),       icon="currency-dollar"),
+            sac.TabsItem(t("tab_sentiment"),     icon="chat-square-text"),
+            sac.TabsItem(t("tab_risk"),          icon="shield-exclamation"),
         ], color="#36cfc9", size="sm", align="start")
 
         def show(key, fallback="_Not available_"):
             txt = state.get(key, "")
             st.markdown(txt if txt else fallback)
 
-        if tab == "Final Decision":
-            show("final_trade_decision", "_No final decision recorded._")
-
-        elif tab == "Trader Plan":
+        if tab == t("tab_final"):
+            show("final_trade_decision", t("no_final"))
+        elif tab == t("tab_trader"):
             show("trader_investment_plan")
-
-        elif tab == "Research Manager":
+        elif tab == t("tab_research"):
             show("investment_plan")
-
-        elif tab == "Market":
-            show("market_report", "_Market analyst not selected._")
-
-        elif tab == "News":
-            show("news_report", "_News analyst not selected._")
-
-        elif tab == "Fundamentals":
-            show("fundamentals_report", "_Fundamentals analyst not selected._")
-
-        elif tab == "Valuation":
-            show("valuation_report", "_Valuation analyst not selected._")
-
-        elif tab == "Macro":
-            show("macro_report", "_Macro analyst not selected._")
-
-        elif tab == "Options":
-            show("options_report", "_Options analyst not selected. Enable 'Options (LEAP vs Stock)' in the sidebar._")
-
-        elif tab == "Sentiment":
-            show("sentiment_report", "_Sentiment analyst not selected._")
-
-        elif tab == "Risk Debate":
+        elif tab == t("tab_market"):
+            show("market_report", t("no_market"))
+        elif tab == t("tab_news"):
+            show("news_report", t("no_news"))
+        elif tab == t("tab_fundamentals"):
+            show("fundamentals_report", t("no_fund"))
+        elif tab == t("tab_valuation"):
+            show("valuation_report", t("no_val"))
+        elif tab == t("tab_macro"):
+            show("macro_report", t("no_macro"))
+        elif tab == t("tab_options"):
+            show("options_report", t("no_opt"))
+        elif tab == t("tab_sentiment"):
+            show("sentiment_report", t("no_sent"))
+        elif tab == t("tab_risk"):
             rds = state.get("risk_debate_state", {})
             c1, c2, c3 = st.columns(3)
             with c1:
@@ -1216,4 +1477,4 @@ Macro   ┘  Res. Mgr
                 st.markdown(con[:3000] + ("…" if len(con) > 3000 else ""))
 
         st.divider()
-        st.caption(f"Completed: **{ticker_label}** · {date_label} · Change ticker/date in sidebar to rerun.")
+        st.caption(t("completed_cap", ticker=ticker_label, date=date_label))
