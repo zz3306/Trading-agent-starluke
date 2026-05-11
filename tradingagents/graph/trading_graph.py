@@ -38,6 +38,7 @@ from tradingagents.agents.utils.agent_utils import (
     get_insider_transactions,
     get_global_news
 )
+from tradingagents.agents.analysts.macro_analyst import fetch_macro_data
 
 from .checkpointer import checkpoint_step, clear_checkpoint, get_checkpointer, thread_id
 from .conditional_logic import ConditionalLogic
@@ -75,6 +76,10 @@ class TradingAgentsGraph:
         # Create necessary directories
         os.makedirs(self.config["data_cache_dir"], exist_ok=True)
         os.makedirs(self.config["results_dir"], exist_ok=True)
+
+        # Point the cache layer at a dedicated yfinance-data subfolder
+        from tradingagents.dataflows.cache import set_cache_dir
+        set_cache_dir(os.path.join(self.config["data_cache_dir"], "yfinance"))
 
         # Initialize LLMs with provider-specific thinking configuration
         llm_kwargs = self._get_provider_kwargs()
@@ -195,6 +200,12 @@ class TradingAgentsGraph:
                     # Peer comparison tools
                     get_fundamentals,
                     get_income_statement,
+                ]
+            ),
+            "macro": ToolNode(
+                [
+                    # Macro economic indicator tool
+                    fetch_macro_data,
                 ]
             ),
         }

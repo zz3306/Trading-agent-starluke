@@ -44,11 +44,15 @@ class GraphSetup:
 
         # Ensure valuation always runs after fundamentals when both are selected
         # so the valuation analyst can reuse the fundamentals_report.
+        # Macro runs last among analysts (needs no special dependency).
         ordered = list(selected_analysts)
         if "valuation" in ordered and "fundamentals" in ordered:
             ordered.remove("valuation")
             idx = ordered.index("fundamentals")
             ordered.insert(idx + 1, "valuation")
+        if "macro" in ordered:
+            ordered.remove("macro")
+            ordered.append("macro")
         selected_analysts = ordered
 
         # Create analyst nodes
@@ -90,6 +94,11 @@ class GraphSetup:
             )
             delete_nodes["valuation"] = create_msg_delete()
             tool_nodes["valuation"] = self.tool_nodes["valuation"]
+
+        if "macro" in selected_analysts:
+            analyst_nodes["macro"] = create_macro_analyst(self.quick_thinking_llm)
+            delete_nodes["macro"] = create_msg_delete()
+            tool_nodes["macro"] = self.tool_nodes["macro"]
 
         # Create researcher and manager nodes
         bull_researcher_node = create_bull_researcher(self.quick_thinking_llm)

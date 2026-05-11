@@ -66,6 +66,83 @@ def signal_emoji(signal: str) -> str:
     return {"BUY": "🟢", "SELL": "🔴"}.get(signal, "🟡")
 
 
+def _get_reports_dir() -> Path:
+    try:
+        from tradingagents.default_config import DEFAULT_CONFIG
+        local = DEFAULT_CONFIG.get("results_dir_local")
+        if local:
+            return Path(local)
+        return Path(DEFAULT_CONFIG["results_dir"])
+    except Exception:
+        return Path("reports")
+
+
+def _render_browse_reports():
+    """Show all previously generated reports grouped by ticker."""
+    reports_dir = _get_reports_dir()
+    if not reports_dir.exists():
+        st.info("No reports saved yet. Run an analysis first.")
+        return
+
+    tickers = sorted([p.name for p in reports_dir.iterdir() if p.is_dir() and p.name != "signal_log.csv"])
+    if not tickers:
+        st.info("No reports saved yet.")
+        return
+
+    selected_ticker = st.selectbox("Select ticker", tickers)
+    ticker_dir = reports_dir / selected_ticker
+    dates = sorted([p.name for p in ticker_dir.iterdir() if p.is_dir()], reverse=True)
+
+    if not dates:
+        st.info(f"No dated reports for {selected_ticker}.")
+        return
+
+    selected_date = st.selectbox("Select date", dates)
+    report_path = ticker_dir / selected_date / "complete_report.md"
+
+    if report_path.exists():
+        st.markdown(f"**{selected_ticker} — {selected_date}**")
+        st.markdown(report_path.read_text(encoding="utf-8"))
+    else:
+        # Show individual section files
+        st.info("No complete_report.md found. Showing available section files:")
+        for md_file in sorted((ticker_dir / selected_date).rglob("*.md")):
+            with st.expander(md_file.relative_to(ticker_dir / selected_date).as_posix()):
+                st.markdown(md_file.read_text(encoding="utf-8"))
+
+
+def _render_signal_log():
+    """Show the signal tracking CSV as a table."""
+    import pandas as pd
+
+    reports_dir = _get_reports_dir()
+    log_path = reports_dir / "signal_log.csv"
+
+    if not log_path.exists():
+        st.info("No signals logged yet. Signal log is created after your first analysis.")
+        return
+
+    try:
+        df = pd.read_csv(log_path)
+        if df.empty:
+            st.info("Signal log is empty.")
+            return
+
+        # Color signals
+        def color_signal(val):
+            if val == "BUY":
+                return "background-color: #0d6e3f22; color: #0d6e3f; font-weight: bold"
+            if val == "SELL":
+                return "background-color: #8b000022; color: #8b0000; font-weight: bold"
+            return "color: #b8860b; font-weight: bold"
+
+        styled = df.style.applymap(color_signal, subset=["signal"])
+        st.dataframe(styled, use_container_width=True)
+        st.caption(f"Total signals: {len(df)} | BUY: {(df.signal=='BUY').sum()} | SELL: {(df.signal=='SELL').sum()} | HOLD: {(df.signal=='HOLD').sum()}")
+    except Exception as e:
+        st.error(f"Could not read signal log: {e}")
+
+
 def run_analysis(ticker, trade_date, analysts, result_holder, quick_model="claude-cli", deep_model="claude-cli"):
     """Run in a background thread; deposit result into result_holder dict."""
     try:
@@ -96,6 +173,13 @@ def run_analysis(ticker, trade_date, analysts, result_holder, quick_model="claud
         result_holder["state"] = final_state
         result_holder["signal"] = signal
         result_holder["error"] = None
+
+        # Log signal
+        try:
+            from cli.main import _append_signal_log
+            _append_signal_log(config, ticker, str(trade_date), signal)
+        except Exception:
+            pass
     except Exception as e:
         result_holder["error"] = str(e)
         result_holder["state"] = None
@@ -103,7 +187,7 @@ def run_analysis(ticker, trade_date, analysts, result_holder, quick_model="claud
 
 # ── Sidebar ────────────────────────────────────────────────────────────────────
 with st.sidebar:
-    st.title("📈 TradingAgents")
+    st.title("📈 STARLUKE")
     st.caption("Powered by Claude CLI · Zero API cost")
     st.divider()
 
@@ -126,13 +210,16 @@ with st.sidebar:
     use_social = st.checkbox("Social (uses same news data as News analyst)", value=False,
                              help="yfinance 不提供 Reddit/Twitter 数据，Social 分析师实际调用的数据源与 News 相同，选了会增加耗时但不会增加数据维度。")
     use_valuation = st.checkbox("Valuation & Peers", value=True,
-                                help="拉取同行公司数据进行估值倍数对比，自动复用 Fundamentals 报告（如已选）避免重复请求。")
+                                help="Fetches 3-4 peer companies for P/E, EV/EBITDA comparison. Reuses Fundamentals data if selected.")
+    use_macro = st.checkbox("Macro (Fed/CPI/Yield Curve)", value=True,
+                            help="Fetches treasury yields, VIX, dollar index. Results cached 7 days — very fast on repeat runs.")
 
     selected_analysts = []
     if use_market:       selected_analysts.append("market")
     if use_news:         selected_analysts.append("news")
     if use_fundamentals: selected_analysts.append("fundamentals")
     if use_valuation:    selected_analysts.append("valuation")
+    if use_macro:        selected_analysts.append("macro")
     if use_social:       selected_analysts.append("social")
 
     st.markdown("**Model selection**")
@@ -162,7 +249,7 @@ with st.sidebar:
 
 
 # ── Main area ──────────────────────────────────────────────────────────────────
-st.title(f"Stock Analysis")
+st.title("STARLUKE — Stock Analysis")
 
 if "result" not in st.session_state:
     st.session_state.result = None
@@ -196,16 +283,25 @@ if run_btn and not st.session_state.running:
 result = st.session_state.result
 
 if result is None:
-    st.info("Configure your analysis in the sidebar and click **Run Analysis**.")
-    st.markdown("""
-    ### How it works
-    1. **Analyst agents** pull real market data via yfinance (free)
-    2. **Research team** debates bull vs bear case
-    3. **Risk team** stress-tests the position sizing
-    4. **Portfolio Manager** issues the final verdict
+    main_tabs = st.tabs(["🚀 New Analysis", "📂 Browse Reports", "📊 Signal Log"])
 
-    All LLM calls go through your local `claude` CLI — no API keys needed.
-    """)
+    with main_tabs[0]:
+        st.info("Configure your analysis in the sidebar and click **Run Analysis**.")
+        st.markdown("""
+        ### How it works
+        1. **Analyst agents** pull real market data via yfinance (free)
+        2. **Research team** debates bull vs bear case
+        3. **Risk team** stress-tests the position sizing
+        4. **Portfolio Manager** issues the final verdict
+
+        All LLM calls go through your local `claude` CLI — no API keys needed.
+        """)
+
+    with main_tabs[1]:
+        _render_browse_reports()
+
+    with main_tabs[2]:
+        _render_signal_log()
 
 elif result.get("error"):
     st.error(f"Analysis failed:\n\n```\n{result['error']}\n```")
@@ -235,12 +331,15 @@ else:
         "📋 Final Decision",
         "📊 Trader Plan",
         "🔬 Research Manager",
-        "📈 Market Report",
-        "📰 News Report",
+        "📈 Market",
+        "📰 News",
         "💰 Fundamentals",
-        "📉 Valuation & Peers",
+        "📉 Valuation",
+        "🌍 Macro",
         "💬 Sentiment",
         "⚖️ Risk Debate",
+        "📂 Browse",
+        "📊 Signal Log",
     ])
 
     with tabs[0]:
@@ -267,7 +366,7 @@ else:
 
     with tabs[4]:
         report = state.get("news_report", "")
-        st.markdown("### News & Macro Analysis")
+        st.markdown("### News Analysis")
         st.markdown(report if report else "_News analyst not selected or no report generated._")
 
     with tabs[5]:
@@ -281,14 +380,18 @@ else:
         st.markdown(report if report else "_Valuation analyst not selected or no report generated._")
 
     with tabs[7]:
+        report = state.get("macro_report", "")
+        st.markdown("### Macro Environment")
+        st.markdown(report if report else "_Macro analyst not selected or no report generated._")
+
+    with tabs[8]:
         report = state.get("sentiment_report", "")
         st.markdown("### Social Media Sentiment")
         st.markdown(report if report else "_Sentiment analyst not selected or no report generated._")
 
-    with tabs[8]:
+    with tabs[9]:
         st.markdown("### Risk Team Debate")
         rds = state.get("risk_debate_state", {})
-
         col1, col2, col3 = st.columns(3)
         with col1:
             st.markdown("**🔴 Aggressive**")
@@ -302,6 +405,12 @@ else:
             st.markdown("**🟢 Conservative**")
             con = rds.get("current_conservative_response", "_Not available_")
             st.markdown(con[:3000] + ("…" if len(con) > 3000 else ""))
+
+    with tabs[10]:
+        _render_browse_reports()
+
+    with tabs[11]:
+        _render_signal_log()
 
     # ── Divider + re-run hint ─────────────────────────────────────────────
     st.divider()

@@ -16,6 +16,7 @@ ANALYST_ORDER = [
     ("News Analyst", AnalystType.NEWS),
     ("Fundamentals Analyst", AnalystType.FUNDAMENTALS),
     ("Valuation Analyst (peer comparison & multiples)", AnalystType.VALUATION),
+    ("Macro Analyst (Fed/CPI/yield curve — cached weekly)", AnalystType.MACRO),
 ]
 
 

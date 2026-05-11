@@ -686,6 +686,40 @@ def get_analysis_date():
             )
 
 
+def _append_signal_log(config: dict, ticker: str, analysis_date: str, signal: str) -> None:
+    """Append one row to the signal tracking CSV."""
+    import csv
+    import yfinance as yf
+
+    log_path = Path(config.get("results_dir_local") or config["results_dir"]) / "signal_log.csv"
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+
+    # Try to get the closing price for the analysis date
+    price = ""
+    try:
+        from datetime import datetime, timedelta
+        dt = datetime.strptime(analysis_date, "%Y-%m-%d")
+        end = (dt + timedelta(days=3)).strftime("%Y-%m-%d")
+        hist = yf.Ticker(ticker).history(start=analysis_date, end=end)
+        if not hist.empty:
+            price = f"{hist['Close'].iloc[0]:.2f}"
+    except Exception:
+        pass
+
+    write_header = not log_path.exists()
+    with open(log_path, "a", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        if write_header:
+            writer.writerow(["analyzed_at", "ticker", "analysis_date", "signal", "price_at_date"])
+        writer.writerow([
+            datetime.now().strftime("%Y-%m-%d %H:%M"),
+            ticker,
+            analysis_date,
+            signal,
+            price,
+        ])
+
+
 def save_report_to_disk(final_state, ticker: str, save_path: Path):
     """Save complete analysis report to disk with organized subfolders."""
     save_path.mkdir(parents=True, exist_ok=True)
@@ -714,6 +748,10 @@ def save_report_to_disk(final_state, ticker: str, save_path: Path):
         analysts_dir.mkdir(exist_ok=True)
         (analysts_dir / "valuation.md").write_text(final_state["valuation_report"], encoding="utf-8")
         analyst_parts.append(("Valuation Analyst", final_state["valuation_report"]))
+    if final_state.get("macro_report"):
+        analysts_dir.mkdir(exist_ok=True)
+        (analysts_dir / "macro.md").write_text(final_state["macro_report"], encoding="utf-8")
+        analyst_parts.append(("Macro Analyst", final_state["macro_report"]))
     if analyst_parts:
         content = "\n\n".join(f"### {name}\n{text}" for name, text in analyst_parts)
         sections.append(f"## I. Analyst Team Reports\n\n{content}")
@@ -797,6 +835,8 @@ def display_complete_report(final_state):
         analysts.append(("Fundamentals Analyst", final_state["fundamentals_report"]))
     if final_state.get("valuation_report"):
         analysts.append(("Valuation Analyst", final_state["valuation_report"]))
+    if final_state.get("macro_report"):
+        analysts.append(("Macro Analyst", final_state["macro_report"]))
     if analysts:
         console.print(Panel("[bold]I. Analyst Team Reports[/bold]", border_style="cyan"))
         for title, content in analysts:
@@ -1232,6 +1272,9 @@ def run_analysis(checkpoint: bool = False):
 
     # Post-analysis prompts (outside Live context for clean interaction)
     console.print("\n[bold cyan]Analysis Complete![/bold cyan]\n")
+
+    # Signal tracking — append to signal_log.csv
+    _append_signal_log(config, selections["ticker"], selections["analysis_date"], decision)
 
     # Auto-save to local project reports/ folder (always, no prompt)
     local_reports_dir = config.get("results_dir_local")
