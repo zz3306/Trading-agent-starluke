@@ -1,5 +1,5 @@
 """
-TradingAgents Web UI — powered by Streamlit + Claude CLI bridge
+STARLUKE Web UI — powered by Streamlit + streamlit-antd-components
 Run: streamlit run app.py
 """
 
@@ -10,6 +10,7 @@ from datetime import date, timedelta
 from pathlib import Path
 
 import streamlit as st
+import streamlit_antd_components as sac
 
 os.environ.setdefault("PYTHONUTF8", "1")
 
@@ -24,275 +25,119 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# ── Theme CSS definitions ──────────────────────────────────────────────────────
-_COMMON = """
-/* shared layout */
-.starluke-header {
-    display: flex; align-items: center; gap: 12px;
-    padding: 12px 0 10px; margin-bottom: 20px;
-}
-.starluke-header img { height: 52px; }
-.starluke-subtitle {
-    font-size: 0.82rem; letter-spacing: 3px;
-    text-transform: uppercase; margin-top: 3px;
-}
-.decision-box {
-    padding: 26px 36px; border-radius: 12px;
-    font-size: 2.1rem; font-weight: 700;
-    text-align: center; margin-bottom: 24px; letter-spacing: 1px;
-}
-[data-testid="stSidebar"] img { display: block; margin: 0 auto; }
-[data-testid="stAlert"] { border-radius: 8px !important; border-left-width: 3px !important; }
-[data-testid="stDataFrame"] { border-radius: 8px !important; }
-"""
-
-DARK_CSS = _COMMON + """
+# ── Global CSS ─────────────────────────────────────────────────────────────────
+st.markdown("""
+<style>
+/* Dark base */
 html, body, [data-testid="stAppViewContainer"], [data-testid="stMain"] {
-    background-color: #121212 !important; color: #e8e8e8 !important;
+    background-color: #0f0f0f !important;
+    color: #e8e8e8 !important;
 }
 [data-testid="stSidebar"] {
-    background-color: #1a1a1a !important;
-    border-right: 1px solid #2a2a2a !important;
+    background-color: #141414 !important;
+    border-right: 1px solid #222 !important;
+    padding-top: 0 !important;
 }
-[data-testid="stSidebar"] * { color: #e0e0e0 !important; }
+
+/* Logo area */
+.logo-wrap {
+    padding: 20px 16px 12px;
+    border-bottom: 1px solid #222;
+    margin-bottom: 4px;
+}
+.logo-wrap img { width: 100%; max-width: 200px; display: block; margin: 0 auto; }
+.logo-sub {
+    text-align: center; font-size: 10px; color: #444;
+    letter-spacing: 3px; text-transform: uppercase; margin-top: 6px;
+}
+
+/* Signal banner */
+.sig-banner {
+    border-radius: 10px; padding: 22px 32px;
+    font-size: 2rem; font-weight: 700;
+    text-align: center; margin-bottom: 20px; letter-spacing: 1px;
+}
+.sig-buy  { background:#00e67608; border:2px solid #00e676; color:#00e676;
+             box-shadow: 0 0 28px #00e67618; }
+.sig-sell { background:#ff174408; border:2px solid #ff1744; color:#ff1744;
+             box-shadow: 0 0 28px #ff174418; }
+.sig-hold { background:#ffb80008; border:2px solid #ffb800; color:#ffb800;
+             box-shadow: 0 0 28px #ffb80018; }
+.sig-sub  { font-size: 0.9rem; font-weight: 400; opacity: 0.65; margin-top: 6px; }
+
+/* Main header */
+.main-header {
+    display: flex; align-items: center; gap: 14px;
+    padding: 18px 0 14px; border-bottom: 1px solid #222; margin-bottom: 20px;
+}
+.main-header img { height: 44px; }
+.main-header-sub { font-size: 10px; color: #444; letter-spacing: 3px; text-transform: uppercase; }
+
+/* Markdown content */
+[data-testid="stMarkdownContainer"] { color: #ccc !important; }
+[data-testid="stMarkdownContainer"] h1,
+[data-testid="stMarkdownContainer"] h2,
+[data-testid="stMarkdownContainer"] h3 { color: #36cfc9 !important; }
+[data-testid="stMarkdownContainer"] table { border-collapse: collapse !important; width: 100% !important; }
+[data-testid="stMarkdownContainer"] th {
+    background: #1a1a1a !important; color: #36cfc9 !important;
+    border: 1px solid #222 !important; padding: 8px 12px !important;
+}
+[data-testid="stMarkdownContainer"] td {
+    border: 1px solid #222 !important; padding: 8px 12px !important; color: #ccc !important;
+}
+[data-testid="stMarkdownContainer"] tr:nth-child(even) td { background: #161616 !important; }
+
+/* Inputs */
 [data-testid="stTextInput"] input, [data-testid="stDateInput"] input {
-    background: #1e1e1e !important; border: 1px solid #2a2a2a !important;
+    background: #1a1a1a !important; border: 1px solid #2a2a2a !important;
     color: #e8e8e8 !important; border-radius: 6px !important;
 }
 [data-testid="stSelectbox"] > div > div {
-    background: #1e1e1e !important; border: 1px solid #2a2a2a !important; color: #e8e8e8 !important;
+    background: #1a1a1a !important; border: 1px solid #2a2a2a !important; color: #e8e8e8 !important;
 }
-[data-testid="stButton"] button[kind="primary"] {
-    background: linear-gradient(135deg, #00d4ff, #0099cc) !important;
-    border: none !important; color: #0a0a0a !important;
-    font-weight: 700 !important; border-radius: 8px !important;
-    box-shadow: 0 0 14px #00d4ff44 !important;
-}
-[data-testid="stButton"] button[kind="primary"]:hover { box-shadow: 0 0 28px #00d4ff77 !important; }
-[data-testid="stTabs"] [data-baseweb="tab-list"] {
-    background: #1a1a1a !important; border-bottom: 1px solid #2a2a2a !important; gap: 2px;
-}
-[data-testid="stTabs"] [data-baseweb="tab"] {
-    background: transparent !important; color: #888 !important; font-size: 0.84rem !important;
-}
-[data-testid="stTabs"] [aria-selected="true"] {
-    background: #1e1e1e !important; color: #00d4ff !important;
-    border-bottom: 2px solid #00d4ff !important;
-}
-[data-testid="stExpander"] {
-    background: #1e1e1e !important; border: 1px solid #2a2a2a !important; border-radius: 8px !important;
-}
-[data-testid="stMarkdownContainer"] { color: #d0d0d0 !important; }
-[data-testid="stMarkdownContainer"] h1,
-[data-testid="stMarkdownContainer"] h2,
-[data-testid="stMarkdownContainer"] h3 { color: #00d4ff !important; }
-[data-testid="stMarkdownContainer"] th {
-    background: #1e1e1e !important; color: #00d4ff !important;
-    border: 1px solid #2a2a2a !important; padding: 8px 12px !important;
-}
-[data-testid="stMarkdownContainer"] td {
-    border: 1px solid #2a2a2a !important; padding: 8px 12px !important; color: #d0d0d0 !important;
-}
-[data-testid="stMarkdownContainer"] tr:nth-child(even) td { background: #1a1a1a !important; }
-hr { border-color: #2a2a2a !important; }
-[data-testid="stCaptionContainer"] { color: #666 !important; }
-[data-testid="stCheckbox"] label { color: #c0c0c0 !important; }
-.starluke-subtitle { color: #555; }
-.starluke-header { border-bottom: 1px solid #2a2a2a; }
-.buy  { background:#00e67611; border:2px solid #00e676; color:#00e676;
-        box-shadow:0 0 24px #00e67622, inset 0 0 40px #00e67608; }
-.sell { background:#ff174411; border:2px solid #ff1744; color:#ff1744;
-        box-shadow:0 0 24px #ff174422, inset 0 0 40px #ff174408; }
-.hold { background:#ffb80011; border:2px solid #ffb800; color:#ffb800;
-        box-shadow:0 0 24px #ffb80022, inset 0 0 40px #ffb80008; }
-"""
 
-LIGHT_CSS = _COMMON + """
-html, body, [data-testid="stAppViewContainer"], [data-testid="stMain"] {
-    background-color: #f4f6f9 !important; color: #1a1a2e !important;
-}
-[data-testid="stSidebar"] {
-    background-color: #ffffff !important;
-    border-right: 1px solid #e0e4ea !important;
-    box-shadow: 2px 0 8px #0001;
-}
-[data-testid="stSidebar"] * { color: #2a2a3e !important; }
-[data-testid="stTextInput"] input, [data-testid="stDateInput"] input {
-    background: #ffffff !important; border: 1px solid #d0d4dc !important;
-    color: #1a1a2e !important; border-radius: 6px !important;
-}
-[data-testid="stSelectbox"] > div > div {
-    background: #ffffff !important; border: 1px solid #d0d4dc !important; color: #1a1a2e !important;
-}
+/* Run button */
 [data-testid="stButton"] button[kind="primary"] {
-    background: linear-gradient(135deg, #0066cc, #004fa3) !important;
-    border: none !important; color: #ffffff !important;
-    font-weight: 700 !important; border-radius: 8px !important;
-    box-shadow: 0 2px 12px #0066cc33 !important;
-}
-[data-testid="stButton"] button[kind="primary"]:hover { box-shadow: 0 4px 20px #0066cc55 !important; }
-[data-testid="stTabs"] [data-baseweb="tab-list"] {
-    background: #ffffff !important; border-bottom: 2px solid #e0e4ea !important; gap: 2px;
-}
-[data-testid="stTabs"] [data-baseweb="tab"] {
-    background: transparent !important; color: #8a8fa8 !important; font-size: 0.84rem !important;
-}
-[data-testid="stTabs"] [aria-selected="true"] {
-    background: #f4f6f9 !important; color: #0066cc !important;
-    border-bottom: 2px solid #0066cc !important; font-weight: 600 !important;
-}
-[data-testid="stExpander"] {
-    background: #ffffff !important; border: 1px solid #e0e4ea !important;
-    border-radius: 8px !important; box-shadow: 0 1px 4px #0001;
-}
-[data-testid="stMarkdownContainer"] { color: #2a2a3e !important; }
-[data-testid="stMarkdownContainer"] h1,
-[data-testid="stMarkdownContainer"] h2,
-[data-testid="stMarkdownContainer"] h3 { color: #0052a3 !important; }
-[data-testid="stMarkdownContainer"] th {
-    background: #eaf1fb !important; color: #0052a3 !important;
-    border: 1px solid #d0d4dc !important; padding: 8px 12px !important;
-}
-[data-testid="stMarkdownContainer"] td {
-    border: 1px solid #e0e4ea !important; padding: 8px 12px !important; color: #2a2a3e !important;
-}
-[data-testid="stMarkdownContainer"] tr:nth-child(even) td { background: #f8fafc !important; }
-hr { border-color: #e0e4ea !important; }
-[data-testid="stCaptionContainer"] { color: #8a8fa8 !important; }
-[data-testid="stCheckbox"] label { color: #3a3a5e !important; }
-.starluke-subtitle { color: #8a8fa8; }
-.starluke-header { border-bottom: 2px solid #e0e4ea; }
-.buy  { background:#e6f9f0; border:2px solid #00843d; color:#00843d;
-        box-shadow: 0 2px 12px #00843d22; }
-.sell { background:#fdecea; border:2px solid #c0392b; color:#c0392b;
-        box-shadow: 0 2px 12px #c0392b22; }
-.hold { background:#fef8e7; border:2px solid #d4780a; color:#d4780a;
-        box-shadow: 0 2px 12px #d4780a22; }
-"""
-
-RAINBOW_CSS = _COMMON + """
-@keyframes rborder {
-  0%  { border-color:#ff3333; box-shadow:0 0 28px #ff333344,inset 0 0 40px #ff333308; }
-  25% { border-color:#3366ff; box-shadow:0 0 28px #3366ff44,inset 0 0 40px #3366ff08; }
-  50% { border-color:#33cc44; box-shadow:0 0 28px #33cc4444,inset 0 0 40px #33cc4408; }
-  75% { border-color:#ffdd00; box-shadow:0 0 28px #ffdd0044,inset 0 0 40px #ffdd0008; }
-  100%{ border-color:#ff3333; box-shadow:0 0 28px #ff333344,inset 0 0 40px #ff333308; }
-}
-@keyframes rbtn {
-  0%  { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
-  100%{ background-position: 0% 50%; }
-}
-@keyframes rglow {
-  0%  { filter: drop-shadow(0 0 8px #ff3333aa); }
-  25% { filter: drop-shadow(0 0 8px #3366ffaa); }
-  50% { filter: drop-shadow(0 0 8px #33cc44aa); }
-  75% { filter: drop-shadow(0 0 8px #ffdd00aa); }
-  100%{ filter: drop-shadow(0 0 8px #ff3333aa); }
-}
-@keyframes rtab {
-  0%  { border-bottom-color:#ff3333; color:#ff3333; }
-  25% { border-bottom-color:#3366ff; color:#3366ff; }
-  50% { border-bottom-color:#33cc44; color:#33cc44; }
-  75% { border-bottom-color:#ffdd00; color:#ffdd00; }
-  100%{ border-bottom-color:#ff3333; color:#ff3333; }
-}
-html, body, [data-testid="stAppViewContainer"], [data-testid="stMain"] {
-    background-color: #090909 !important; color: #efefef !important;
-}
-[data-testid="stSidebar"] {
-    background-color: #0d0d0d !important;
-    border-right: 1px solid #1f1f1f !important;
-}
-[data-testid="stSidebar"] * { color: #e8e8e8 !important; }
-[data-testid="stSidebar"] img { animation: rglow 4s ease-in-out infinite; }
-[data-testid="stTextInput"] input, [data-testid="stDateInput"] input {
-    background: #141414 !important; border: 1px solid #2a2a2a !important;
-    color: #efefef !important; border-radius: 6px !important;
-}
-[data-testid="stSelectbox"] > div > div {
-    background: #141414 !important; border: 1px solid #2a2a2a !important; color: #efefef !important;
-}
-[data-testid="stButton"] button[kind="primary"] {
-    background: linear-gradient(270deg,#ff3333,#3366ff,#33cc44,#ffdd00,#ff3333) !important;
-    background-size: 300% 300% !important;
-    animation: rbtn 4s ease infinite !important;
+    background: linear-gradient(135deg, #36cfc9, #0d9e99) !important;
     border: none !important; color: #050505 !important;
-    font-weight: 800 !important; border-radius: 8px !important;
-    box-shadow: 0 0 18px #ffffff22 !important;
+    font-weight: 700 !important; border-radius: 8px !important;
+    box-shadow: 0 0 16px #36cfc944 !important; letter-spacing: 0.4px !important;
 }
-[data-testid="stTabs"] [data-baseweb="tab-list"] {
-    background: #0d0d0d !important; border-bottom: 1px solid #1f1f1f !important; gap: 2px;
+[data-testid="stButton"] button[kind="primary"]:hover {
+    box-shadow: 0 0 28px #36cfc966 !important;
 }
-[data-testid="stTabs"] [data-baseweb="tab"] {
-    background: transparent !important; color: #666 !important; font-size: 0.84rem !important;
-}
-[data-testid="stTabs"] [aria-selected="true"] {
-    background: #141414 !important;
-    animation: rtab 4s linear infinite !important;
-    border-bottom-width: 2px !important; border-bottom-style: solid !important;
-}
-[data-testid="stExpander"] {
-    background: #141414 !important; border: 1px solid #222 !important; border-radius: 8px !important;
-}
-[data-testid="stMarkdownContainer"] { color: #d8d8d8 !important; }
-[data-testid="stMarkdownContainer"] h1,
-[data-testid="stMarkdownContainer"] h2,
-[data-testid="stMarkdownContainer"] h3 {
-    background: linear-gradient(90deg,#ff3333,#3366ff,#33cc44,#ffdd00);
-    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-    background-clip: text;
-}
-[data-testid="stMarkdownContainer"] th {
-    background: #141414 !important; border: 1px solid #222 !important; padding: 8px 12px !important;
-    background: linear-gradient(90deg,#ff333322,#3366ff22,#33cc4422,#ffdd0022) !important;
-}
-[data-testid="stMarkdownContainer"] td {
-    border: 1px solid #1f1f1f !important; padding: 8px 12px !important; color: #d8d8d8 !important;
-}
-[data-testid="stMarkdownContainer"] tr:nth-child(even) td { background: #0d0d0d !important; }
-hr { border-color: #1f1f1f !important; }
-[data-testid="stCaptionContainer"] { color: #555 !important; }
-[data-testid="stCheckbox"] label { color: #ccc !important; }
-.starluke-subtitle { color: #444; }
-.starluke-header { border-bottom: 1px solid #1f1f1f; }
-.starluke-logo-wrap { animation: rglow 4s ease-in-out infinite; display:inline-block; }
-.buy  { background:#0a1a0a; animation: rborder 4s linear infinite; border:2px solid #33cc44; color:#33cc44; }
-.sell { background:#1a0a0a; border:2px solid #ff3333; color:#ff3333;
-        box-shadow:0 0 28px #ff333344,inset 0 0 40px #ff333308;
-        animation: none; }
-.hold { background:#1a1600; border:2px solid #ffdd00; color:#ffdd00;
-        box-shadow:0 0 28px #ffdd0044,inset 0 0 40px #ffdd0008;
-        animation: none; }
-"""
 
-_THEME_MAP = {"🌙 Dark": "dark", "☀️ Light": "light", "🌈 Rainbow": "rainbow"}
-_CSS_MAP   = {"dark": DARK_CSS, "light": LIGHT_CSS, "rainbow": RAINBOW_CSS}
+/* Antd overrides — dark */
+.ant-menu { background: transparent !important; }
+.ant-menu-item-selected { background: #1f2a2a !important; }
+.ant-tabs-tab { color: #666 !important; }
+.ant-tabs-tab-active .ant-tabs-tab-btn { color: #36cfc9 !important; }
+.ant-tabs-ink-bar { background: #36cfc9 !important; }
+
+hr { border-color: #222 !important; }
+[data-testid="stCaptionContainer"] { color: #555 !important; }
+[data-testid="stCheckbox"] label { color: #aaa !important; }
+[data-testid="stAlert"] { border-radius: 8px !important; }
+[data-testid="stDataFrame"] { border-radius: 8px !important; }
+</style>
+""", unsafe_allow_html=True)
+
 
 # ── Session state ──────────────────────────────────────────────────────────────
-if "theme"       not in st.session_state: st.session_state.theme       = "dark"
 if "result"      not in st.session_state: st.session_state.result      = None
 if "running"     not in st.session_state: st.session_state.running     = False
-if "last_ticker" not in st.session_state: st.session_state.last_ticker = None
-
-# ── Inject active theme ────────────────────────────────────────────────────────
-st.markdown(f"<style>{_CSS_MAP[st.session_state.theme]}</style>", unsafe_allow_html=True)
+if "nav"         not in st.session_state: st.session_state.nav         = "New Analysis"
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
 def detect_signal(text: str) -> str:
     upper = text.upper()
-    for word in ("STRONG BUY", "OVERWEIGHT", "BUY"):
-        if word in upper: return "BUY"
-    for word in ("STRONG SELL", "UNDERWEIGHT", "SELL"):
-        if word in upper: return "SELL"
+    for w in ("STRONG BUY", "OVERWEIGHT", "BUY"):
+        if w in upper: return "BUY"
+    for w in ("STRONG SELL", "UNDERWEIGHT", "SELL"):
+        if w in upper: return "SELL"
     return "HOLD"
-
-def signal_css(signal: str) -> str:
-    return {"BUY": "buy", "SELL": "sell"}.get(signal, "hold")
-
-def signal_emoji(signal: str) -> str:
-    return {"BUY": "🟢", "SELL": "🔴"}.get(signal, "🟡")
 
 def _get_reports_dir() -> Path:
     try:
@@ -305,109 +150,104 @@ def _get_reports_dir() -> Path:
 def _render_browse_reports():
     reports_dir = _get_reports_dir()
     if not reports_dir.exists():
-        st.info("No reports saved yet. Run an analysis first.")
+        sac.alert("No reports saved yet. Run an analysis first.", type="info", banner=False)
         return
-    tickers = sorted([p.name for p in reports_dir.iterdir() if p.is_dir() and p.name != "signal_log.csv"])
+    tickers = sorted([p.name for p in reports_dir.iterdir()
+                      if p.is_dir() and p.name != "signal_log.csv"])
     if not tickers:
-        st.info("No reports saved yet.")
+        sac.alert("No reports saved yet.", type="info", banner=False)
         return
-    selected_ticker = st.selectbox("Select ticker", tickers)
+    selected_ticker = st.selectbox("Ticker", tickers)
     ticker_dir = reports_dir / selected_ticker
     dates = sorted([p.name for p in ticker_dir.iterdir() if p.is_dir()], reverse=True)
     if not dates:
-        st.info(f"No dated reports for {selected_ticker}.")
+        sac.alert(f"No reports for {selected_ticker}.", type="info", banner=False)
         return
-    selected_date = st.selectbox("Select date", dates)
+    selected_date = st.selectbox("Date", dates)
     report_path = ticker_dir / selected_date / "complete_report.md"
     if report_path.exists():
         st.markdown(f"**{selected_ticker} — {selected_date}**")
         st.markdown(report_path.read_text(encoding="utf-8"))
     else:
-        st.info("No complete_report.md found. Showing available section files:")
         for md_file in sorted((ticker_dir / selected_date).rglob("*.md")):
             with st.expander(md_file.relative_to(ticker_dir / selected_date).as_posix()):
                 st.markdown(md_file.read_text(encoding="utf-8"))
 
 def _render_signal_log():
     import pandas as pd
-    reports_dir = _get_reports_dir()
-    log_path = reports_dir / "signal_log.csv"
+    log_path = _get_reports_dir() / "signal_log.csv"
     if not log_path.exists():
-        st.info("No signals logged yet.")
+        sac.alert("No signals logged yet. Signal log is created after your first analysis.",
+                  type="info", banner=False)
         return
     try:
         df = pd.read_csv(log_path)
         if df.empty:
-            st.info("Signal log is empty.")
+            sac.alert("Signal log is empty.", type="info", banner=False)
             return
         def color_signal(val):
-            if val == "BUY":  return "background-color:#0d6e3f22;color:#0d6e3f;font-weight:bold"
-            if val == "SELL": return "background-color:#8b000022;color:#8b0000;font-weight:bold"
-            return "color:#b8860b;font-weight:bold"
-        styled = df.style.applymap(color_signal, subset=["signal"])
-        st.dataframe(styled, use_container_width=True)
-        st.caption(f"Total: {len(df)} | BUY: {(df.signal=='BUY').sum()} | SELL: {(df.signal=='SELL').sum()} | HOLD: {(df.signal=='HOLD').sum()}")
+            if val == "BUY":  return "color:#00e676;font-weight:bold"
+            if val == "SELL": return "color:#ff1744;font-weight:bold"
+            return "color:#ffb800;font-weight:bold"
+        st.dataframe(df.style.applymap(color_signal, subset=["signal"]),
+                     use_container_width=True)
+        c1, c2, c3, c4 = st.columns(4)
+        c1.metric("Total",  len(df))
+        c2.metric("BUY",  int((df.signal == "BUY").sum()))
+        c3.metric("SELL", int((df.signal == "SELL").sum()))
+        c4.metric("HOLD", int((df.signal == "HOLD").sum()))
     except Exception as e:
-        st.error(f"Could not read signal log: {e}")
+        sac.alert(f"Could not read signal log: {e}", type="error", banner=False)
 
-def run_analysis(ticker, trade_date, analysts, result_holder, quick_model="claude-cli", deep_model="claude-cli"):
+def run_analysis(ticker, trade_date, analysts, result_holder,
+                 quick_model="claude-cli", deep_model="claude-cli"):
     try:
         from tradingagents.graph.trading_graph import TradingAgentsGraph
         from tradingagents.default_config import DEFAULT_CONFIG
         config = DEFAULT_CONFIG.copy()
-        config["max_debate_rounds"] = 1
-        config["max_risk_discuss_rounds"] = 1
-        config["selected_analysts"] = analysts
-        config["quick_think_llm"] = quick_model
-        config["deep_think_llm"] = deep_model
+        config.update({"max_debate_rounds": 1, "max_risk_discuss_rounds": 1,
+                        "selected_analysts": analysts,
+                        "quick_think_llm": quick_model, "deep_think_llm": deep_model})
         ta = TradingAgentsGraph(debug=False, config=config)
         final_state, signal = ta.propagate(ticker, str(trade_date))
         from cli.main import save_report_to_disk
-        date_str = str(trade_date)
         for base in [config.get("results_dir_local"), config.get("results_dir")]:
             if base:
-                try: save_report_to_disk(final_state, ticker, Path(base) / ticker / date_str)
+                try: save_report_to_disk(final_state, ticker,
+                                         Path(base) / ticker / str(trade_date))
                 except Exception: pass
-        result_holder["state"] = final_state
-        result_holder["signal"] = signal
-        result_holder["error"] = None
+        result_holder.update({"state": final_state, "signal": signal, "error": None})
         try:
             from cli.main import _append_signal_log
             _append_signal_log(config, ticker, str(trade_date), signal)
         except Exception: pass
     except Exception as e:
-        result_holder["error"] = str(e)
-        result_holder["state"] = None
+        result_holder.update({"error": str(e), "state": None})
 
 
-# ── Sidebar ────────────────────────────────────────────────────────────────────
+# ── SIDEBAR ────────────────────────────────────────────────────────────────────
 with st.sidebar:
-    # Logo — the rainbow STARLUKE image in all themes
+    # Logo
     if _logo_b64:
-        st.markdown(
-            f'<img src="data:image/png;base64,{_logo_b64}" '
-            f'style="width:100%;padding:6px 12px 2px;" alt="STARLUKE">',
-            unsafe_allow_html=True,
-        )
-    else:
-        st.markdown("## ⭐ STARLUKE")
+        st.markdown(f"""
+        <div class="logo-wrap">
+            <img src="data:image/png;base64,{_logo_b64}" alt="STARLUKE">
+            <div class="logo-sub">Powered by Claude CLI</div>
+        </div>
+        """, unsafe_allow_html=True)
 
-    st.caption("Powered by Claude CLI · Zero API cost")
+    # Navigation menu
+    nav = sac.menu([
+        sac.MenuItem("New Analysis",   icon="rocket-takeoff"),
+        sac.MenuItem("Browse Reports", icon="folder2-open"),
+        sac.MenuItem("Signal Log",     icon="bar-chart-line"),
+    ], color="#36cfc9", size="sm", indent=16, open_all=True)
+    if nav: st.session_state.nav = nav
 
-    # ── Theme switcher ────────────────────────────────────────────────────────
-    st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
-    tc1, tc2, tc3 = st.columns(3)
-    for col, (label, key) in zip([tc1, tc2, tc3], _THEME_MAP.items()):
-        with col:
-            active = st.session_state.theme == key
-            if st.button(label, use_container_width=True, disabled=active, key=f"theme_{key}"):
-                st.session_state.theme = key
-                st.rerun()
-
-    st.divider()
+    sac.divider(label="Configuration", align="center", color="#333")
 
     ticker = st.text_input(
-        "Stock Ticker", value="AAPL", placeholder="e.g. NVDA, TSLA, MSFT",
+        "Stock Ticker", value="AAPL", placeholder="e.g. NVDA, TSLA, 0700.HK"
     ).upper().strip()
 
     trade_date = st.date_input(
@@ -416,68 +256,63 @@ with st.sidebar:
         max_value=date.today(),
     )
 
-    st.markdown("**Analysts to include**")
-    use_market       = st.checkbox("Market (Technical)", value=True)
-    use_news         = st.checkbox("News", value=True)
-    use_fundamentals = st.checkbox("Fundamentals", value=True)
-    use_social       = st.checkbox("Social (same data source as News)", value=False,
-                                   help="yfinance doesn't provide Reddit/Twitter data; this reuses the news feed.")
-    use_valuation    = st.checkbox("Valuation & Peers", value=True,
-                                   help="Fetches 3-4 peers for P/E, EV/EBITDA comparison.")
-    use_macro        = st.checkbox("Macro (Fed/CPI/Yield Curve)", value=True,
-                                   help="Treasury yields, VIX, dollar index. Cached 7 days.")
+    sac.divider(label="Analysts", align="center", color="#333")
 
-    selected_analysts = []
-    if use_market:       selected_analysts.append("market")
-    if use_news:         selected_analysts.append("news")
-    if use_fundamentals: selected_analysts.append("fundamentals")
-    if use_valuation:    selected_analysts.append("valuation")
-    if use_macro:        selected_analysts.append("macro")
-    if use_social:       selected_analysts.append("social")
+    use_market       = st.checkbox("Market (Technical)",      value=True)
+    use_news         = st.checkbox("News",                    value=True)
+    use_fundamentals = st.checkbox("Fundamentals",            value=True)
+    use_valuation    = st.checkbox("Valuation & Peers",       value=True,
+                                   help="Peer P/E, EV/EBITDA comparison")
+    use_macro        = st.checkbox("Macro (Fed/CPI/Yield)",   value=True,
+                                   help="Cached 7 days — very fast on repeats")
+    use_social       = st.checkbox("Social (= News data)",    value=False,
+                                   help="yfinance doesn't have Reddit/Twitter data")
 
-    st.markdown("**Model selection**")
+    selected_analysts = (
+        (["market"]       if use_market       else []) +
+        (["news"]         if use_news         else []) +
+        (["fundamentals"] if use_fundamentals else []) +
+        (["valuation"]    if use_valuation    else []) +
+        (["macro"]        if use_macro        else []) +
+        (["social"]       if use_social       else [])
+    )
+
+    sac.divider(label="Model", align="center", color="#333")
+
     from tradingagents.llm_clients.model_catalog import get_model_options
-    _quick_opts   = get_model_options("claude_cli", "quick")
-    _deep_opts    = get_model_options("claude_cli", "deep")
-    quick_labels  = [label for label, _ in _quick_opts]
-    deep_labels   = [label for label, _ in _deep_opts]
-    quick_model_label = st.selectbox("Analysts & Trader (quick)", options=quick_labels, index=0)
-    deep_model_label  = st.selectbox("Research & Portfolio Mgr (deep)", options=deep_labels, index=0)
-    quick_model = dict(_quick_opts)[quick_model_label]
-    deep_model  = dict(_deep_opts)[deep_model_label]
+    _qopts = get_model_options("claude_cli", "quick")
+    _dopts = get_model_options("claude_cli", "deep")
+    quick_model = dict(_qopts)[st.selectbox("Quick (analysts)", [l for l,_ in _qopts], index=0)]
+    deep_model  = dict(_dopts)[st.selectbox("Deep (PM & research)", [l for l,_ in _dopts], index=0)]
 
-    st.divider()
+    st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
+
     run_btn = st.button(
-        "🚀 Run Analysis",
-        use_container_width=True,
-        type="primary",
+        "🚀  Run Analysis", use_container_width=True, type="primary",
         disabled=not ticker or not selected_analysts,
     )
     if not selected_analysts:
-        st.warning("Select at least one analyst.")
-    st.divider()
-    st.caption("💡 First run ~3-5 min depending on analysts.")
+        sac.alert("Select at least one analyst.", type="warning", banner=False)
+
+    st.markdown("<div style='height:4px'></div>", unsafe_allow_html=True)
+    st.caption("💡 First run ~3–5 min · Results auto-saved to reports/")
 
 
-# ── Main area: logo header ─────────────────────────────────────────────────────
+# ── MAIN AREA ──────────────────────────────────────────────────────────────────
+# Header
 if _logo_b64:
-    wrap = "starluke-logo-wrap" if st.session_state.theme == "rainbow" else ""
     st.markdown(f"""
-    <div class="starluke-header">
-        <span class="{wrap}">
-            <img src="data:image/png;base64,{_logo_b64}" alt="STARLUKE" />
-        </span>
-        <div class="starluke-subtitle">Multi-Agent Stock Analysis</div>
+    <div class="main-header">
+        <img src="data:image/png;base64,{_logo_b64}" alt="STARLUKE">
+        <div class="main-header-sub">Multi-Agent Stock Analysis</div>
     </div>
     """, unsafe_allow_html=True)
-else:
-    st.markdown("## ⭐ STARLUKE — Stock Analysis")
 
-# ── Session result state ───────────────────────────────────────────────────────
+# Run analysis
 if run_btn and not st.session_state.running:
-    st.session_state.result = None
+    st.session_state.result  = None
     st.session_state.running = True
-    st.session_state.last_ticker = ticker
+    st.session_state.nav     = "New Analysis"
     result_holder = {}
     thread = threading.Thread(
         target=run_analysis,
@@ -485,104 +320,136 @@ if run_btn and not st.session_state.running:
         daemon=True,
     )
     thread.start()
-    with st.spinner(f"Analyzing **{ticker}** on {trade_date} … (a few minutes)"):
+    with st.spinner(f"Analyzing **{ticker}** on {trade_date}… (a few minutes)"):
         thread.join(timeout=1200)
     st.session_state.running = False
-    st.session_state.result = result_holder
+    st.session_state.result  = result_holder
 
+# ── Page routing ───────────────────────────────────────────────────────────────
+page = st.session_state.nav
 
-# ── Display results ────────────────────────────────────────────────────────────
-result = st.session_state.result
+if page == "Browse Reports":
+    st.markdown("### 📂 Browse Reports")
+    _render_browse_reports()
 
-if result is None:
-    main_tabs = st.tabs(["🚀 New Analysis", "📂 Browse Reports", "📊 Signal Log"])
-    with main_tabs[0]:
-        st.info("Configure your analysis in the sidebar and click **Run Analysis**.")
-        st.markdown("""
-### How it works
-1. **Analyst agents** pull real market data via yfinance (free)
-2. **Research team** debates bull vs bear case
-3. **Risk team** stress-tests the position sizing
-4. **Portfolio Manager** issues the final verdict
-
-All LLM calls go through your local `claude` CLI — no API keys needed.
-        """)
-    with main_tabs[1]: _render_browse_reports()
-    with main_tabs[2]: _render_signal_log()
-
-elif result.get("error"):
-    st.error(f"Analysis failed:\n\n```\n{result['error']}\n```")
+elif page == "Signal Log":
+    st.markdown("### 📊 Signal Log")
+    _render_signal_log()
 
 else:
-    state = result["state"]
-    decision_text = state.get("final_trade_decision", "")
-    signal = detect_signal(decision_text)
-    css    = signal_css(signal)
-    emoji  = signal_emoji(signal)
-    ticker_label     = state.get("company_of_interest", ticker)
-    trade_date_label = state.get("trade_date", str(trade_date))
+    # ── New Analysis page ──────────────────────────────────────────────────────
+    result = st.session_state.result
 
-    st.markdown(f"""
-    <div class="decision-box {css}">
-        {emoji} {ticker_label} — {signal}
-        <div style="font-size:1rem;font-weight:400;margin-top:8px;opacity:0.75;">
-            Analysis date: {trade_date_label}
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
-
-    tabs = st.tabs([
-        "📋 Final Decision", "📊 Trader Plan", "🔬 Research Manager",
-        "📈 Market", "📰 News", "💰 Fundamentals", "📉 Valuation",
-        "🌍 Macro", "💬 Sentiment", "⚖️ Risk Debate", "📂 Browse", "📊 Signal Log",
-    ])
-
-    with tabs[0]:
-        st.markdown("### Portfolio Manager Final Decision")
-        st.markdown(decision_text if decision_text else "_No final decision recorded._")
-    with tabs[1]:
-        st.markdown("### Trader's Investment Plan")
-        plan = state.get("trader_investment_plan", "")
-        st.markdown(plan if plan else "_Not available_")
-    with tabs[2]:
-        st.markdown("### Research Manager Verdict")
-        st.markdown(state.get("investment_plan", "") or "_Not available_")
-    with tabs[3]:
-        st.markdown("### Technical / Market Analysis")
-        st.markdown(state.get("market_report", "") or "_Market analyst not selected._")
-    with tabs[4]:
-        st.markdown("### News Analysis")
-        st.markdown(state.get("news_report", "") or "_News analyst not selected._")
-    with tabs[5]:
-        st.markdown("### Fundamentals Analysis")
-        st.markdown(state.get("fundamentals_report", "") or "_Fundamentals analyst not selected._")
-    with tabs[6]:
-        st.markdown("### Valuation & Peer Comparison")
-        st.markdown(state.get("valuation_report", "") or "_Valuation analyst not selected._")
-    with tabs[7]:
-        st.markdown("### Macro Environment")
-        st.markdown(state.get("macro_report", "") or "_Macro analyst not selected._")
-    with tabs[8]:
-        st.markdown("### Social Media Sentiment")
-        st.markdown(state.get("sentiment_report", "") or "_Sentiment analyst not selected._")
-    with tabs[9]:
-        st.markdown("### Risk Team Debate")
-        rds = state.get("risk_debate_state", {})
-        col1, col2, col3 = st.columns(3)
+    if result is None:
+        # Landing
+        sac.alert(
+            "Configure your analysis in the sidebar and click **Run Analysis**.",
+            type="info", banner=False,
+        )
+        col1, col2 = st.columns(2)
         with col1:
-            st.markdown("**🔴 Aggressive**")
-            agg = rds.get("current_aggressive_response", "_Not available_")
-            st.markdown(agg[:3000] + ("…" if len(agg) > 3000 else ""))
+            st.markdown("""
+#### How it works
+1. **Analyst agents** pull real market data (yfinance, free)
+2. **Bull & Bear researchers** debate the investment thesis
+3. **Trader** converts research into a trade proposal
+4. **Risk team** stress-tests position sizing
+5. **Portfolio Manager** issues the final BUY / HOLD / SELL
+            """)
         with col2:
-            st.markdown("**🟡 Neutral**")
-            neu = rds.get("current_neutral_response", "_Not available_")
-            st.markdown(neu[:3000] + ("…" if len(neu) > 3000 else ""))
-        with col3:
-            st.markdown("**🟢 Conservative**")
-            con = rds.get("current_conservative_response", "_Not available_")
-            st.markdown(con[:3000] + ("…" if len(con) > 3000 else ""))
-    with tabs[10]: _render_browse_reports()
-    with tabs[11]: _render_signal_log()
+            st.markdown("""
+#### Agent pipeline
+```
+Market  ┐
+News    ├─→ Bull/Bear → Research Mgr
+Fund.   │         ↓
+Macro   ┘       Trader
+                  ↓
+         Aggressive / Neutral / Conservative
+                  ↓
+           Portfolio Manager → VERDICT
+```
+            """)
 
-    st.divider()
-    st.caption(f"Analysis completed for **{ticker_label}** on {trade_date_label}. Change ticker/date in sidebar to run again.")
+    elif result.get("error"):
+        sac.alert(f"Analysis failed: {result['error']}", type="error", banner=True)
+
+    else:
+        state  = result["state"]
+        signal = detect_signal(state.get("final_trade_decision", ""))
+        ticker_label = state.get("company_of_interest", ticker)
+        date_label   = state.get("trade_date", str(trade_date))
+
+        sig_cls = {"BUY": "sig-buy", "SELL": "sig-sell"}.get(signal, "sig-hold")
+        sig_ico = {"BUY": "🟢", "SELL": "🔴"}.get(signal, "🟡")
+
+        st.markdown(f"""
+        <div class="sig-banner {sig_cls}">
+            {sig_ico}&nbsp; {ticker_label} — {signal}
+            <div class="sig-sub">Analysis date: {date_label}</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        # Results tabs
+        tab = sac.tabs([
+            sac.TabsItem("Final Decision",    icon="clipboard-check"),
+            sac.TabsItem("Trader Plan",       icon="graph-up-arrow"),
+            sac.TabsItem("Research Manager",  icon="people"),
+            sac.TabsItem("Market",            icon="bar-chart"),
+            sac.TabsItem("News",              icon="newspaper"),
+            sac.TabsItem("Fundamentals",      icon="building"),
+            sac.TabsItem("Valuation",         icon="calculator"),
+            sac.TabsItem("Macro",             icon="globe"),
+            sac.TabsItem("Sentiment",         icon="chat-square-text"),
+            sac.TabsItem("Risk Debate",       icon="shield-exclamation"),
+        ], color="#36cfc9", size="sm", align="start")
+
+        def show(key, fallback="_Not available_"):
+            txt = state.get(key, "")
+            st.markdown(txt if txt else fallback)
+
+        if tab == "Final Decision":
+            show("final_trade_decision", "_No final decision recorded._")
+
+        elif tab == "Trader Plan":
+            show("trader_investment_plan")
+
+        elif tab == "Research Manager":
+            show("investment_plan")
+
+        elif tab == "Market":
+            show("market_report", "_Market analyst not selected._")
+
+        elif tab == "News":
+            show("news_report", "_News analyst not selected._")
+
+        elif tab == "Fundamentals":
+            show("fundamentals_report", "_Fundamentals analyst not selected._")
+
+        elif tab == "Valuation":
+            show("valuation_report", "_Valuation analyst not selected._")
+
+        elif tab == "Macro":
+            show("macro_report", "_Macro analyst not selected._")
+
+        elif tab == "Sentiment":
+            show("sentiment_report", "_Sentiment analyst not selected._")
+
+        elif tab == "Risk Debate":
+            rds = state.get("risk_debate_state", {})
+            c1, c2, c3 = st.columns(3)
+            with c1:
+                sac.divider(label="🔴 Aggressive", color="#ff1744")
+                agg = rds.get("current_aggressive_response", "_Not available_")
+                st.markdown(agg[:3000] + ("…" if len(agg) > 3000 else ""))
+            with c2:
+                sac.divider(label="🟡 Neutral", color="#ffb800")
+                neu = rds.get("current_neutral_response", "_Not available_")
+                st.markdown(neu[:3000] + ("…" if len(neu) > 3000 else ""))
+            with c3:
+                sac.divider(label="🟢 Conservative", color="#00e676")
+                con = rds.get("current_conservative_response", "_Not available_")
+                st.markdown(con[:3000] + ("…" if len(con) > 3000 else ""))
+
+        st.divider()
+        st.caption(f"Completed: **{ticker_label}** · {date_label} · Change ticker/date in sidebar to rerun.")
