@@ -1305,15 +1305,15 @@ if run_btn and not st.session_state.running:
     )
 
     with _RUN_LOCK:
-        _RUN.update({"active": True, "progress": [], "result": None, "done": False,
-                     "error": None, "pipeline": _pipeline})
-    st.session_state.result       = None
-    st.session_state.running      = True
-    st.session_state.nav          = "New Analysis"
-    st.session_state._run_ticker  = ticker
-    st.session_state._run_date    = str(trade_date)
-    st.session_state._run_total   = _total
-    st.session_state._run_started = time.time()
+        _RUN.update({"active": True, "progress": [], "result": None, "done": False, "error": None})
+    st.session_state.result        = None
+    st.session_state.running       = True
+    st.session_state.nav           = "New Analysis"
+    st.session_state._run_ticker   = ticker
+    st.session_state._run_date     = str(trade_date)
+    st.session_state._run_total    = _total
+    st.session_state._run_started  = time.time()
+    st.session_state._run_pipeline = _pipeline   # store in session_state, not _RUN
     threading.Thread(
         target=run_analysis,
         args=(ticker, trade_date, selected_analysts, quick_model, deep_model,
@@ -1352,12 +1352,12 @@ else:
 
     if st.session_state.running:
         with _RUN_LOCK:
-            _prog     = list(_RUN["progress"])
-            _pipeline = list(_RUN.get("pipeline", []))
-        _total   = st.session_state.get("_run_total", 15)
-        _ticker  = st.session_state.get("_run_ticker", "")
-        _rdate   = st.session_state.get("_run_date", "")
-        _elapsed = int(time.time() - st.session_state.get("_run_started", time.time()))
+            _prog = list(_RUN["progress"])
+        _pipeline = st.session_state.get("_run_pipeline", [])
+        _total    = st.session_state.get("_run_total", 15)
+        _ticker   = st.session_state.get("_run_ticker", "")
+        _rdate    = st.session_state.get("_run_date", "")
+        _elapsed  = int(time.time() - st.session_state.get("_run_started", time.time()))
         _mins, _secs = divmod(_elapsed, 60)
 
         # Which node is currently running = next one after all completed ones
