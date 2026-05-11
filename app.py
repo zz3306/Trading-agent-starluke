@@ -166,100 +166,59 @@ if _bg_b64:
 # ── Welcome screen ─────────────────────────────────────────────────────────────
 if not st.session_state.username:
     _bg_url = f'url("data:image/png;base64,{_bg_b64}")' if _bg_b64 else "none"
-    _logo_url = f'url("data:image/png;base64,{_logo_b64}")' if _logo_b64 else "none"
     st.markdown(f"""
     <style>
-    /* hide sidebar and strip all default padding */
     [data-testid="stSidebar"] {{ display: none !important; }}
-    [data-testid="stAppViewContainer"],
-    [data-testid="stMain"],
-    [data-testid="stMain"] > div,
-    [data-testid="stMain"] > div > div,
-    [data-testid="block-container"] {{
-        padding: 0 !important;
-        margin: 0 !important;
-        max-width: 100% !important;
-    }}
-    /* full-screen background */
+
+    /* full-screen background + dark overlay */
     [data-testid="stAppViewContainer"] {{
         background-image: {_bg_url};
         background-size: cover;
         background-position: center;
-        min-height: 100vh;
     }}
-    /* dark overlay */
     [data-testid="stAppViewContainer"]::after {{
-        content: "";
-        position: fixed;
-        inset: 0;
-        background: rgba(0,0,0,0.65);
-        pointer-events: none;
-        z-index: 0;
+        content:""; position:fixed; inset:0;
+        background:rgba(0,0,0,0.68);
+        pointer-events:none; z-index:0;
     }}
-    /* center the Streamlit block container */
-    [data-testid="stMain"] {{
-        display: flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        min-height: 100vh !important;
-        position: relative;
-        z-index: 1;
-    }}
+
+    /* push the block container down so everything sits in the vertical center */
     [data-testid="block-container"] {{
-        display: flex !important;
-        flex-direction: column !important;
-        align-items: center !important;
-        justify-content: center !important;
-        width: 100% !important;
-        min-height: 100vh !important;
+        padding-top: 12vh !important;
+        max-width: 520px !important;
+        position: relative; z-index: 1;
     }}
-    /* card */
-    .wc-card {{
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        gap: 0;
+
+    /* logo: fill the column, centered */
+    .wc-logo {{
+        display: block;
         width: 100%;
         max-width: 480px;
-        padding: 0 24px;
-    }}
-    .wc-logo {{
-        width: 480px;
-        max-width: 90vw;
-        margin-bottom: 6px;
-        filter: drop-shadow(0 0 32px #36cfc955);
+        margin: 0 auto 4px;
+        filter: drop-shadow(0 0 28px #36cfc966);
     }}
     .wc-sub {{
-        font-size: 0.78rem;
+        text-align: center;
+        font-size: 0.72rem;
         letter-spacing: 5px;
         text-transform: uppercase;
         color: #aaa;
-        margin-bottom: 32px;
-        text-align: center;
-    }}
-    /* make input and button full width */
-    .wc-card [data-testid="stTextInput"],
-    .wc-card [data-testid="stTextInput"] input,
-    .wc-card [data-testid="stButton"] button {{
-        width: 100% !important;
+        margin-bottom: 28px;
     }}
     </style>
     """, unsafe_allow_html=True)
 
-    st.markdown('<div class="wc-card">', unsafe_allow_html=True)
     if _logo_b64:
         st.markdown(
             f'<img class="wc-logo" src="data:image/png;base64,{_logo_b64}" alt="STARLUKE">',
             unsafe_allow_html=True,
         )
     st.markdown('<div class="wc-sub">Multi-Agent Stock Analysis</div>', unsafe_allow_html=True)
-
-    name_input = st.text_input("What's your name?", placeholder="Enter your name…")
+    name_input = st.text_input("What's your name?", placeholder="Enter your name…", label_visibility="visible")
     if st.button("Enter →", use_container_width=True, type="primary"):
         if name_input.strip():
             st.session_state.username = name_input.strip()
             st.rerun()
-    st.markdown('</div>', unsafe_allow_html=True)
     st.stop()
 
 
