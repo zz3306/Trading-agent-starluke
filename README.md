@@ -1,5 +1,9 @@
 # STARLUKE
 
+<p align="center">
+  <img src="assets/Starluke.png" alt="STARLUKE" width="640" />
+</p>
+
 **Multi-Agent LLM Stock Analysis — Zero API Cost**
 
 Run a full institutional-grade stock analysis pipeline entirely through your local [Claude Code](https://claude.ai/code) session. No Anthropic API key. No OpenAI key. Just your existing Claude login.
