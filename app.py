@@ -1064,7 +1064,7 @@ def run_analysis(ticker, trade_date, analysts,
             "output_language": output_language,
             **depth_cfg,
         })
-        ta = TradingAgentsGraph(debug=False, config=config)
+        ta = TradingAgentsGraph(selected_analysts=analysts, debug=False, config=config)
         final_state, signal = ta.propagate(ticker, str(trade_date), progress_cb=_progress_cb)
         from cli.main import save_report_to_disk, extract_and_save_summary
         for base in [config.get("results_dir_local"), config.get("results_dir")]:

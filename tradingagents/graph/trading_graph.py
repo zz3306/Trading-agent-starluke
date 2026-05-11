@@ -49,6 +49,36 @@ from .propagation import Propagator
 from .reflection import Reflector
 from .signal_processing import SignalProcessor
 
+# ── Internal node-progress callback ───────────────────────────────────────────
+# Nodes whose names begin with these prefixes are internal graph plumbing.
+# We skip them so the progress bar only shows meaningful analyst/researcher names.
+_SKIP_PREFIXES = ("tools_", "Msg Clear", "__")
+
+try:
+    from langchain_core.callbacks.base import BaseCallbackHandler as _BaseCallbackHandler
+
+    class _NodeProgressCallback(_BaseCallbackHandler):
+        """Fires progress_cb(node_name) whenever a top-level LangGraph node finishes."""
+
+        def __init__(self, progress_cb):
+            super().__init__()
+            self._cb = progress_cb
+
+        def on_chain_end(self, outputs, *, run_id=None, parent_run_id=None,
+                         tags=None, run_name=None, **kwargs):
+            name = run_name or ""
+            if not name:
+                return
+            if any(name.startswith(p) for p in _SKIP_PREFIXES):
+                return
+            try:
+                self._cb(name)
+            except Exception:
+                pass
+
+except ImportError:
+    _NodeProgressCallback = None  # type: ignore
+
 
 class TradingAgentsGraph:
     """Main class that orchestrates the trading agents framework."""
@@ -346,69 +376,26 @@ class TradingAgentsGraph:
             tid = thread_id(company_name, str(trade_date))
             args.setdefault("config", {}).setdefault("configurable", {})["thread_id"] = tid
 
-        if progress_cb is not None or self.debug:
-            # Use default stream mode ("values") — yields the full state after each
-            # node, same as the original debug path. We infer which node just ran by
-            # watching which report fields change between consecutive states.
-            _FIELD_NODE = {
-                "market_report":          "Market Analyst",
-                "news_report":            "News Analyst",
-                "sentiment_report":       "Social Analyst",
-                "fundamentals_report":    "Fundamentals Analyst",
-                "valuation_report":       "Valuation Analyst",
-                "macro_report":           "Macro Analyst",
-                "options_report":         "Options Analyst",
-                "research_report":        "Research Manager",
-                "trader_investment_plan": "Trader",
-                "final_trade_decision":   "Portfolio Manager",
-            }
-            _debate_count = 0
-            _risk_count   = 0
-            prev          = {}
-            final_state   = None
-
-            for chunk in self.graph.stream(init_agent_state, **args):
-                if self.debug:
-                    msgs = chunk.get("messages", [])
-                    if msgs:
-                        msgs[-1].pretty_print()
-
-                if progress_cb:
-                    fired = False
-                    # Simple string-field changes → analyst nodes
-                    for field, node_name in _FIELD_NODE.items():
-                        if chunk.get(field) and not prev.get(field):
-                            try:
-                                progress_cb(node_name)
-                            except Exception:
-                                pass
-                            fired = True
-                            break
-                    if not fired:
-                        # Debate state change → bull or bear
-                        if chunk.get("investment_debate_state") != prev.get("investment_debate_state"):
-                            _debate_count += 1
-                            node = "Bull Researcher" if _debate_count % 2 == 1 else "Bear Researcher"
-                            try:
-                                progress_cb(node)
-                            except Exception:
-                                pass
-                        # Risk state change → one of the three risk analysts
-                        elif chunk.get("risk_debate_state") != prev.get("risk_debate_state"):
-                            _risk_count += 1
-                            _risk_nodes = ["Aggressive Analyst", "Neutral Analyst", "Conservative Analyst"]
-                            try:
-                                progress_cb(_risk_nodes[(_risk_count - 1) % 3])
-                            except Exception:
-                                pass
-
-                prev        = chunk
-                final_state = chunk
-
-            if final_state is None:
-                raise RuntimeError("Graph stream produced no output")
+        # Inject progress callback into LangGraph config when provided.
+        # Uses LangChain's BaseCallbackHandler so it works alongside graph.invoke()
+        # without touching stream_mode (avoids "got multiple values" errors).
+        if progress_cb and _NodeProgressCallback is not None:
+            run_args = dict(args)
+            cfg = dict(run_args.pop("config", {}))
+            cfg.setdefault("callbacks", []).append(_NodeProgressCallback(progress_cb))
+            run_args["config"] = cfg
         else:
-            final_state = self.graph.invoke(init_agent_state, **args)
+            run_args = args
+
+        if self.debug:
+            trace = []
+            for chunk in self.graph.stream(init_agent_state, **run_args):
+                if chunk.get("messages"):
+                    chunk["messages"][-1].pretty_print()
+                trace.append(chunk)
+            final_state = trace[-1] if trace else self.graph.invoke(init_agent_state, **run_args)
+        else:
+            final_state = self.graph.invoke(init_agent_state, **run_args)
 
         # Store current state for reflection.
         self.curr_state = final_state
