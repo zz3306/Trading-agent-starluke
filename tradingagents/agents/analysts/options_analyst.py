@@ -1,96 +1,97 @@
-"""Options Analyst: LEAP vs stock recommendation based on yfinance options chain."""
+"""Options Analyst: LEAP vs stock recommendation based on options chain."""
 
-from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+from __future__ import annotations
+
+import logging
+
+from langchain_core.messages import HumanMessage, SystemMessage, ToolMessage
 
 from tradingagents.agents.utils.agent_utils import (
     build_instrument_context,
     get_language_instruction,
-)
-from tradingagents.agents.utils.options_tools import (
     get_options_chain,
     get_stock_price_for_options,
 )
 
+logger = logging.getLogger(__name__)
+
+_MAX_ITERS = 5
+
 
 def create_options_analyst(llm):
+    tools = [get_stock_price_for_options, get_options_chain]
+    _tool_map = {t.name: t for t in tools}
+    options_llm = llm.bind_tools(tools)
+
     def options_analyst_node(state):
         current_date = state["trade_date"]
         ticker = state["company_of_interest"]
         instrument_context = build_instrument_context(ticker)
 
-        tools = [get_stock_price_for_options, get_options_chain]
+        system_prompt = (
+            f"You are an Options Analyst specializing in LEAP options strategy.\n\n"
+            f"Your job is to determine whether an investor should:\n"
+            f"1. **BUY STOCK** — purchase shares outright\n"
+            f"2. **BUY LEAP CALLS** — buy long-dated call options (6–18 months to expiry)\n"
+            f"3. **SPLIT** — allocate part to stock and part to LEAPs\n\n"
+            f"Workflow:\n"
+            f"Step 1 — Call get_stock_price_for_options to get current price, 52-week range, and historical volatility for {ticker}.\n"
+            f"Step 2 — Call get_options_chain to retrieve LEAP expirations and ATM options table.\n"
+            f"Step 3 — Write a structured Options Analysis Report with:\n\n"
+            f"**1. LEAP Suitability Check**\n"
+            f"- Sufficient open interest and volume? (Liquidity)\n"
+            f"- IV reasonable vs historical volatility? (IV rank)\n"
+            f"- Binary event risk (earnings, FDA, etc.)?\n\n"
+            f"**2. LEAP vs Stock Cost Comparison**\n"
+            f"Pick one ATM or slightly OTM LEAP strike and show:\n"
+            f"- LEAP mid price and expiration\n"
+            f"- Capital required per contract (mid × 100)\n"
+            f"- Equivalent stock cost for 100 shares\n"
+            f"- Capital efficiency ratio\n"
+            f"- Breakeven price at expiration\n\n"
+            f"**3. Risk/Reward Analysis**\n"
+            f"- Max loss: LEAP to $0 vs stock drawdown\n"
+            f"- Upside leverage: % gain if stock rises 20%, 40%\n"
+            f"- Theta burn manageability\n\n"
+            f"**4. Recommendation**\n"
+            f"State exactly one: BUY STOCK, BUY LEAP (with strike/expiry), or SPLIT (X%/Y%).\n\n"
+            f"Current date: {current_date}. {instrument_context}"
+            f"{get_language_instruction()}"
+        )
 
-        system_message = f"""You are an Options Analyst specializing in LEAP options strategy.
-
-Your job is to determine whether an investor should:
-1. **BUY STOCK** — purchase shares outright
-2. **BUY LEAP CALLS** — buy long-dated call options (typically 6–18 months to expiry)
-3. **SPLIT** — allocate part to stock and part to LEAPs
-
-**Workflow:**
-Step 1 — Call `get_stock_price_for_options` to get the current price, 52-week range, and historical volatility for {ticker}.
-Step 2 — Call `get_options_chain` to retrieve the available LEAP expirations and the ATM options table.
-Step 3 — Write a structured Options Analysis Report with these sections:
-
----
-
-**1. LEAP Suitability Check**
-Answer these questions:
-- Is there sufficient open interest and volume in the LEAP strikes? (Liquidity)
-- Is implied volatility reasonable relative to historical volatility? (IV rank assessment)
-- Does {ticker} have binary event risk (upcoming earnings, FDA approval, etc.) that could spike IV?
-
-**2. LEAP vs Stock Cost Comparison**
-Pick one representative LEAP strike (ATM or slightly OTM) and show:
-- LEAP mid price and expiration
-- Capital required per contract (mid × 100)
-- Equivalent stock cost for 100 shares
-- Capital efficiency ratio (stock cost ÷ LEAP cost)
-- Breakeven price at expiration
-
-**3. Risk/Reward Analysis**
-- Max loss scenario: LEAP goes to $0 vs stock drawdown risk
-- Upside leverage: % gain if stock rises 20%, 40%
-- Time decay pressure (theta burn — is theta manageable relative to the expected move?)
-
-**4. Recommendation**
-State exactly one of:
-- **BUY STOCK** — with justification
-- **BUY LEAP** — specify the recommended strike and expiration
-- **SPLIT (X% stock / Y% LEAP)** — with justification
-
-Include a one-paragraph rationale referencing the data you fetched.
-
----
-
-Keep the report data-driven and concise. Always use specific numbers from the options chain.{get_language_instruction()}"""
-
-        prompt = ChatPromptTemplate.from_messages([
-            (
-                "system",
-                "You are a helpful AI assistant collaborating with other assistants. "
-                "Use the provided tools to fetch live options data and produce a LEAP vs stock recommendation. "
-                "You have access to the following tools: {tool_names}.\n{system_message}"
-                "The current date is {current_date}. {instrument_context}",
+        messages = [
+            SystemMessage(content=system_prompt),
+            HumanMessage(
+                content=f"Perform a LEAP vs stock options analysis for {ticker} as of {current_date}."
             ),
-            MessagesPlaceholder(variable_name="messages"),
-        ])
+        ]
 
-        prompt = prompt.partial(system_message=system_message)
-        prompt = prompt.partial(tool_names=", ".join([t.name for t in tools]))
-        prompt = prompt.partial(current_date=current_date)
-        prompt = prompt.partial(instrument_context=instrument_context)
+        report = "[Options analysis unavailable]"
+        try:
+            for _ in range(_MAX_ITERS):
+                response = options_llm.invoke(messages)
+                messages.append(response)
 
-        chain = prompt | llm.bind_tools(tools)
-        result = chain.invoke(state["messages"])
+                if not response.tool_calls:
+                    report = response.content or report
+                    break
 
-        report = ""
-        if len(result.tool_calls) == 0:
-            report = result.content
+                for tc in response.tool_calls:
+                    tool_fn = _tool_map.get(tc["name"])
+                    try:
+                        result = tool_fn.invoke(tc["args"]) if tool_fn else f"[Unknown tool: {tc['name']}]"
+                    except Exception as exc:
+                        result = f"[Tool error: {exc}]"
+                    messages.append(ToolMessage(content=str(result), tool_call_id=tc["id"]))
+            else:
+                messages.append(HumanMessage(content="Summarize your options analysis now based on the data collected."))
+                response = options_llm.invoke(messages)
+                messages.append(response)
+                report = response.content or report
 
-        return {
-            "messages": [result],
-            "options_report": report,
-        }
+        except Exception as exc:
+            logger.warning("Options analyst failed: %s", exc)
+
+        return {"messages": messages, "options_report": report}
 
     return options_analyst_node

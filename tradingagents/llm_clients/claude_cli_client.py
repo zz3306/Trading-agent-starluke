@@ -20,8 +20,11 @@ prompt engineering:
 """
 
 import json
+import os
 import re
+import shutil
 import subprocess
+import sys
 import uuid
 from typing import Any, Iterator, List, Optional, Sequence
 
@@ -37,6 +40,55 @@ from langchain_core.outputs import ChatGeneration, ChatResult
 from pydantic import Field
 
 from .base_client import BaseLLMClient
+
+# ---------------------------------------------------------------------------
+# Claude executable resolution (shared by this module, runner, and app)
+# ---------------------------------------------------------------------------
+
+def find_claude_exe() -> str:
+    """Return the full path to the claude CLI executable.
+
+    On Windows, Python subprocesses often inherit a narrower PATH than the
+    user's interactive shell, so the npm global bin directory (where
+    claude.cmd lives) may be absent.  We try four strategies in order:
+
+    1. shutil.which("claude")     — standard PATH lookup (PATHEXT-aware)
+    2. shutil.which("claude.cmd") — explicit .cmd variant for npm installs
+    3. Hard-coded common Windows install locations
+    4. Augment PATH with the npm global bin dir and retry which()
+
+    Returns the resolved path, or bare "claude" as a last-resort fallback
+    (Popen will raise FileNotFoundError if it still cannot be found).
+    """
+    if sys.platform != "win32":
+        return shutil.which("claude") or "claude"
+
+    # Strategies 1 & 2
+    exe = shutil.which("claude") or shutil.which("claude.cmd")
+    if exe:
+        return exe
+
+    # Strategy 3 — probe known Windows locations
+    home = os.path.expanduser("~")
+    candidates = [
+        os.path.join(home, "AppData", "Roaming", "npm", "claude.cmd"),
+        os.path.join(home, "AppData", "Local", "Programs", "claude", "claude.exe"),
+        os.path.expandvars(r"%APPDATA%\npm\claude.cmd"),
+        os.path.expandvars(r"%LOCALAPPDATA%\Programs\claude\claude.exe"),
+    ]
+    for c in candidates:
+        if os.path.isfile(c):
+            return c
+
+    # Strategy 4 — augment PATH with npm global bin and retry
+    npm_bin = os.path.join(home, "AppData", "Roaming", "npm")
+    augmented = npm_bin + os.pathsep + os.environ.get("PATH", "")
+    exe = shutil.which("claude", path=augmented) or shutil.which("claude.cmd", path=augmented)
+    if exe:
+        return exe
+
+    return "claude"  # fallback; Popen will raise FileNotFoundError if missing
+
 
 # ---------------------------------------------------------------------------
 # Prompt templates
@@ -217,10 +269,10 @@ class ClaudeCLIChatModel(BaseChatModel):
     # ------------------------------------------------------------------
 
     def _call_cli(self, prompt: str) -> str:
-        import sys
+        claude_exe = find_claude_exe()
+        extra_kwargs = {"creationflags": subprocess.CREATE_NO_WINDOW} if sys.platform == "win32" else {}
 
-        # Build base command.
-        cmd = ["claude", "--output-format", "text"]
+        cmd = [claude_exe, "--output-format", "text"]
         if self.skip_permissions:
             cmd.append("--dangerously-skip-permissions")
         if self.model_name and self.model_name != "claude-cli":
@@ -231,11 +283,10 @@ class ClaudeCLIChatModel(BaseChatModel):
                 cmd + ["-p", prompt],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
-                stdin=subprocess.DEVNULL,  # prevent any tty blocking
+                stdin=subprocess.DEVNULL,
                 encoding="utf-8",
                 errors="replace",
-                **( {"creationflags": subprocess.CREATE_NO_WINDOW}
-                    if sys.platform == "win32" else {} ),
+                **extra_kwargs,
             )
             stdout, stderr = proc.communicate(timeout=self.timeout)
 

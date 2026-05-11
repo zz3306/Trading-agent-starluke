@@ -9,6 +9,7 @@ from typing import Any, Callable, Dict, List, Optional
 
 from .prompt import SAAS_FINDER_SYSTEM, build_saas_finder_prompt
 from .storage import save_results
+from tradingagents.llm_clients.claude_cli_client import find_claude_exe
 
 
 def _extract_json_array(text: str) -> List[Dict]:
@@ -62,7 +63,7 @@ def run_saas_finder(
         progress_cb(f"Asking Claude to identify top {n} SaaS moat candidates…")
 
     cmd = [
-        "claude",
+        find_claude_exe(),
         "--output-format", "text",
         "--dangerously-skip-permissions",
         "-p", full_prompt,

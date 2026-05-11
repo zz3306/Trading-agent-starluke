@@ -1,62 +1,94 @@
-from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+"""News Analyst: company-specific and global macro news."""
+
+from __future__ import annotations
+
+import logging
+from datetime import datetime, timedelta
+
+from langchain_core.messages import HumanMessage, SystemMessage, ToolMessage
+
 from tradingagents.agents.utils.agent_utils import (
     build_instrument_context,
     get_global_news,
     get_language_instruction,
     get_news,
 )
-from tradingagents.dataflows.config import get_config
+
+logger = logging.getLogger(__name__)
+
+_MAX_ITERS = 6
 
 
 def create_news_analyst(llm):
+    tools = [get_news, get_global_news]
+    _tool_map = {t.name: t for t in tools}
+    news_llm = llm.bind_tools(tools)
+
     def news_analyst_node(state):
         current_date = state["trade_date"]
-        instrument_context = build_instrument_context(state["company_of_interest"])
+        ticker = state["company_of_interest"]
+        instrument_context = build_instrument_context(ticker)
 
-        tools = [
-            get_news,
-            get_global_news,
+        try:
+            end_dt = datetime.strptime(current_date, "%Y-%m-%d")
+            start_date = (end_dt - timedelta(days=7)).strftime("%Y-%m-%d")
+        except Exception:
+            start_date = current_date
+
+        system_prompt = (
+            f"You are a News Analyst. Your job is to research recent news relevant to trading "
+            f"{ticker} and the broader macro environment.\n\n"
+            f"Use the available tools:\n"
+            f"- get_news(query, start_date, end_date): for company-specific or targeted searches\n"
+            f"- get_global_news(curr_date, look_back_days, limit): for broader macro/sector news\n\n"
+            f"Suggested workflow:\n"
+            f"1. Call get_news for '{ticker} earnings revenue guidance' from {start_date} to {current_date}\n"
+            f"2. Call get_news for '{ticker} competition regulatory risk' from {start_date} to {current_date}\n"
+            f"3. Call get_global_news for broader sector and macro context\n\n"
+            f"Write a comprehensive news report covering:\n"
+            f"- Key company-specific news events\n"
+            f"- Regulatory or competitive developments\n"
+            f"- Relevant macro/sector trends\n"
+            f"- News sentiment and momentum\n"
+            f"- Actionable insights for traders\n"
+            f"Append a Markdown table summarizing news items by date/topic.\n\n"
+            f"Date range: {start_date} to {current_date}. {instrument_context}"
+            f"{get_language_instruction()}"
+        )
+
+        messages = [
+            SystemMessage(content=system_prompt),
+            HumanMessage(
+                content=f"Research news relevant to {ticker} and the macro environment as of {current_date}."
+            ),
         ]
 
-        system_message = (
-            "You are a news researcher tasked with analyzing recent news and trends over the past week. Please write a comprehensive report of the current state of the world that is relevant for trading and macroeconomics. Use the available tools: get_news(query, start_date, end_date) for company-specific or targeted news searches, and get_global_news(curr_date, look_back_days, limit) for broader macroeconomic news. Provide specific, actionable insights with supporting evidence to help traders make informed decisions."
-            + """ Make sure to append a Markdown table at the end of the report to organize key points in the report, organized and easy to read."""
-            + get_language_instruction()
-        )
+        report = "[News analysis unavailable]"
+        try:
+            for _ in range(_MAX_ITERS):
+                response = news_llm.invoke(messages)
+                messages.append(response)
 
-        prompt = ChatPromptTemplate.from_messages(
-            [
-                (
-                    "system",
-                    "You are a helpful AI assistant, collaborating with other assistants."
-                    " Use the provided tools to progress towards answering the question."
-                    " If you are unable to fully answer, that's OK; another assistant with different tools"
-                    " will help where you left off. Execute what you can to make progress."
-                    " If you or any other assistant has the FINAL TRANSACTION PROPOSAL: **BUY/HOLD/SELL** or deliverable,"
-                    " prefix your response with FINAL TRANSACTION PROPOSAL: **BUY/HOLD/SELL** so the team knows to stop."
-                    " You have access to the following tools: {tool_names}.\n{system_message}"
-                    "For your reference, the current date is {current_date}. {instrument_context}",
-                ),
-                MessagesPlaceholder(variable_name="messages"),
-            ]
-        )
+                if not response.tool_calls:
+                    report = response.content or report
+                    break
 
-        prompt = prompt.partial(system_message=system_message)
-        prompt = prompt.partial(tool_names=", ".join([tool.name for tool in tools]))
-        prompt = prompt.partial(current_date=current_date)
-        prompt = prompt.partial(instrument_context=instrument_context)
+                for tc in response.tool_calls:
+                    tool_fn = _tool_map.get(tc["name"])
+                    try:
+                        result = tool_fn.invoke(tc["args"]) if tool_fn else f"[Unknown tool: {tc['name']}]"
+                    except Exception as exc:
+                        result = f"[Tool error: {exc}]"
+                    messages.append(ToolMessage(content=str(result), tool_call_id=tc["id"]))
+            else:
+                messages.append(HumanMessage(content="Summarize your news findings now based on the data collected."))
+                response = news_llm.invoke(messages)
+                messages.append(response)
+                report = response.content or report
 
-        chain = prompt | llm.bind_tools(tools)
-        result = chain.invoke(state["messages"])
+        except Exception as exc:
+            logger.warning("News analyst failed: %s", exc)
 
-        report = ""
-
-        if len(result.tool_calls) == 0:
-            report = result.content
-
-        return {
-            "messages": [result],
-            "news_report": report,
-        }
+        return {"messages": messages, "news_report": report}
 
     return news_analyst_node

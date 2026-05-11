@@ -1,69 +1,89 @@
-from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+"""Fundamentals Analyst: financial statements and company profile."""
+
+from __future__ import annotations
+
+import logging
+
+from langchain_core.messages import HumanMessage, SystemMessage, ToolMessage
+
 from tradingagents.agents.utils.agent_utils import (
     build_instrument_context,
     get_balance_sheet,
     get_cashflow,
     get_fundamentals,
     get_income_statement,
-    get_insider_transactions,
     get_language_instruction,
 )
-from tradingagents.dataflows.config import get_config
+
+logger = logging.getLogger(__name__)
+
+_MAX_ITERS = 8
 
 
 def create_fundamentals_analyst(llm):
+    tools = [get_fundamentals, get_balance_sheet, get_cashflow, get_income_statement]
+    _tool_map = {t.name: t for t in tools}
+    fundamentals_llm = llm.bind_tools(tools)
+
     def fundamentals_analyst_node(state):
         current_date = state["trade_date"]
-        instrument_context = build_instrument_context(state["company_of_interest"])
+        ticker = state["company_of_interest"]
+        instrument_context = build_instrument_context(ticker)
 
-        tools = [
-            get_fundamentals,
-            get_balance_sheet,
-            get_cashflow,
-            get_income_statement,
+        system_prompt = (
+            f"You are a Fundamentals Analyst. Your job is to analyze the financial health "
+            f"and business fundamentals of {ticker}.\n\n"
+            f"Use the available tools:\n"
+            f"- get_fundamentals: comprehensive company profile and key metrics\n"
+            f"- get_balance_sheet: assets, liabilities, equity\n"
+            f"- get_cashflow: operating, investing, financing cash flows\n"
+            f"- get_income_statement: revenue, margins, earnings\n\n"
+            f"Call all four tools to get a complete picture.\n\n"
+            f"Write a comprehensive fundamentals report covering:\n"
+            f"- Business overview and competitive position\n"
+            f"- Revenue growth and profitability trends\n"
+            f"- Balance sheet strength (debt, liquidity, equity)\n"
+            f"- Cash flow generation quality\n"
+            f"- Key financial ratios and red flags\n"
+            f"- Actionable insights for traders and investors\n"
+            f"Append a Markdown table organizing key financial metrics.\n\n"
+            f"Current date: {current_date}. {instrument_context}"
+            f"{get_language_instruction()}"
+        )
+
+        messages = [
+            SystemMessage(content=system_prompt),
+            HumanMessage(
+                content=f"Perform a complete fundamental analysis for {ticker} as of {current_date}."
+            ),
         ]
 
-        system_message = (
-            "You are a researcher tasked with analyzing fundamental information over the past week about a company. Please write a comprehensive report of the company's fundamental information such as financial documents, company profile, basic company financials, and company financial history to gain a full view of the company's fundamental information to inform traders. Make sure to include as much detail as possible. Provide specific, actionable insights with supporting evidence to help traders make informed decisions."
-            + " Make sure to append a Markdown table at the end of the report to organize key points in the report, organized and easy to read."
-            + " Use the available tools: `get_fundamentals` for comprehensive company analysis, `get_balance_sheet`, `get_cashflow`, and `get_income_statement` for specific financial statements."
-            + get_language_instruction(),
-        )
+        report = "[Fundamentals analysis unavailable]"
+        try:
+            for _ in range(_MAX_ITERS):
+                response = fundamentals_llm.invoke(messages)
+                messages.append(response)
 
-        prompt = ChatPromptTemplate.from_messages(
-            [
-                (
-                    "system",
-                    "You are a helpful AI assistant, collaborating with other assistants."
-                    " Use the provided tools to progress towards answering the question."
-                    " If you are unable to fully answer, that's OK; another assistant with different tools"
-                    " will help where you left off. Execute what you can to make progress."
-                    " If you or any other assistant has the FINAL TRANSACTION PROPOSAL: **BUY/HOLD/SELL** or deliverable,"
-                    " prefix your response with FINAL TRANSACTION PROPOSAL: **BUY/HOLD/SELL** so the team knows to stop."
-                    " You have access to the following tools: {tool_names}.\n{system_message}"
-                    "For your reference, the current date is {current_date}. {instrument_context}",
-                ),
-                MessagesPlaceholder(variable_name="messages"),
-            ]
-        )
+                if not response.tool_calls:
+                    report = response.content or report
+                    break
 
-        prompt = prompt.partial(system_message=system_message)
-        prompt = prompt.partial(tool_names=", ".join([tool.name for tool in tools]))
-        prompt = prompt.partial(current_date=current_date)
-        prompt = prompt.partial(instrument_context=instrument_context)
+                for tc in response.tool_calls:
+                    tool_fn = _tool_map.get(tc["name"])
+                    try:
+                        result = tool_fn.invoke(tc["args"]) if tool_fn else f"[Unknown tool: {tc['name']}]"
+                    except Exception as exc:
+                        result = f"[Tool error: {exc}]"
+                    messages.append(ToolMessage(content=str(result), tool_call_id=tc["id"]))
+            else:
+                messages.append(HumanMessage(content="Summarize your fundamentals findings now based on the data collected."))
+                response = fundamentals_llm.invoke(messages)
+                messages.append(response)
+                report = response.content or report
 
-        chain = prompt | llm.bind_tools(tools)
+        except Exception as exc:
+            logger.warning("Fundamentals analyst failed: %s", exc)
 
-        result = chain.invoke(state["messages"])
-
-        report = ""
-
-        if len(result.tool_calls) == 0:
-            report = result.content
-
-        return {
-            "messages": [result],
-            "fundamentals_report": report,
-        }
+        return {"messages": messages, "fundamentals_report": report}
 
     return fundamentals_analyst_node

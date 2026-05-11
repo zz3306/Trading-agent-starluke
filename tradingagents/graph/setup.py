@@ -7,6 +7,7 @@ from langgraph.prebuilt import ToolNode
 from tradingagents.agents import *
 from tradingagents.agents.utils.agent_states import AgentState
 
+from .analyst_cache import with_analyst_cache
 from .conditional_logic import ConditionalLogic
 
 
@@ -65,47 +66,37 @@ class GraphSetup:
         tool_nodes = {}
 
         if "market" in selected_analysts:
-            analyst_nodes["market"] = create_market_analyst(
-                self.quick_thinking_llm
-            )
+            analyst_nodes["market"] = with_analyst_cache("market", create_market_analyst(self.quick_thinking_llm))
             delete_nodes["market"] = create_msg_delete()
             tool_nodes["market"] = self.tool_nodes["market"]
 
         if "social" in selected_analysts:
-            analyst_nodes["social"] = create_social_media_analyst(
-                self.quick_thinking_llm
-            )
+            analyst_nodes["social"] = with_analyst_cache("social", create_social_media_analyst(self.quick_thinking_llm))
             delete_nodes["social"] = create_msg_delete()
             tool_nodes["social"] = self.tool_nodes["social"]
 
         if "news" in selected_analysts:
-            analyst_nodes["news"] = create_news_analyst(
-                self.quick_thinking_llm
-            )
+            analyst_nodes["news"] = with_analyst_cache("news", create_news_analyst(self.quick_thinking_llm))
             delete_nodes["news"] = create_msg_delete()
             tool_nodes["news"] = self.tool_nodes["news"]
 
         if "fundamentals" in selected_analysts:
-            analyst_nodes["fundamentals"] = create_fundamentals_analyst(
-                self.quick_thinking_llm
-            )
+            analyst_nodes["fundamentals"] = with_analyst_cache("fundamentals", create_fundamentals_analyst(self.quick_thinking_llm))
             delete_nodes["fundamentals"] = create_msg_delete()
             tool_nodes["fundamentals"] = self.tool_nodes["fundamentals"]
 
         if "valuation" in selected_analysts:
-            analyst_nodes["valuation"] = create_valuation_analyst(
-                self.quick_thinking_llm
-            )
+            analyst_nodes["valuation"] = with_analyst_cache("valuation", create_valuation_analyst(self.quick_thinking_llm))
             delete_nodes["valuation"] = create_msg_delete()
             tool_nodes["valuation"] = self.tool_nodes["valuation"]
 
         if "macro" in selected_analysts:
-            analyst_nodes["macro"] = create_macro_analyst(self.quick_thinking_llm)
+            analyst_nodes["macro"] = with_analyst_cache("macro", create_macro_analyst(self.quick_thinking_llm))
             delete_nodes["macro"] = create_msg_delete()
             tool_nodes["macro"] = self.tool_nodes["macro"]
 
         if "options" in selected_analysts:
-            analyst_nodes["options"] = create_options_analyst(self.quick_thinking_llm)
+            analyst_nodes["options"] = with_analyst_cache("options", create_options_analyst(self.quick_thinking_llm))
             delete_nodes["options"] = create_msg_delete()
             tool_nodes["options"] = self.tool_nodes["options"]
 
