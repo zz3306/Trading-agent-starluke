@@ -7,6 +7,7 @@ import base64
 import json
 import os
 import threading
+import time
 from datetime import date, timedelta
 from pathlib import Path
 
@@ -14,6 +15,34 @@ import streamlit as st
 import streamlit_antd_components as sac
 
 os.environ.setdefault("PYTHONUTF8", "1")
+
+# ── Module-level run state (persists across Streamlit reruns) ──────────────────
+_RUN_LOCK = threading.Lock()
+_RUN: dict = {"active": False, "progress": [], "result": None, "done": False, "error": None}
+
+_NODE_LABELS: dict = {
+    "Market Analyst":        "📈 Market Analyst",
+    "News Analyst":          "📰 News Analyst",
+    "Fundamentals Analyst":  "🏢 Fundamentals Analyst",
+    "Valuation Analyst":     "🔢 Valuation Analyst",
+    "Macro Analyst":         "🌐 Macro Analyst",
+    "Social Analyst":        "💬 Social Analyst",
+    "Options Analyst":       "💵 Options Analyst",
+    "Bull Researcher":       "🟢 Bull Researcher",
+    "Bear Researcher":       "🔴 Bear Researcher",
+    "Research Manager":      "👔 Research Manager",
+    "Trader":                "🤝 Trader",
+    "Aggressive Analyst":    "🔴 Risk · Aggressive",
+    "Neutral Analyst":       "🟡 Risk · Neutral",
+    "Conservative Analyst":  "🟢 Risk · Conservative",
+    "Portfolio Manager":     "🏆 Portfolio Manager",
+}
+
+_DEPTH_CFG = {
+    "⚡ Shallow":  {"max_debate_rounds": 1, "max_risk_discuss_rounds": 1},
+    "⚖️ Standard": {"max_debate_rounds": 1, "max_risk_discuss_rounds": 2},
+    "🔬 Deep":     {"max_debate_rounds": 2, "max_risk_discuss_rounds": 3},
+}
 
 def _img_b64(name: str) -> str:
     p = Path(__file__).parent / "assets" / name
@@ -725,19 +754,29 @@ def _render_saas_finder_page():
                 st.warning(f"**Key Risk:** {r.get('key_risk','?')}")
 
 
-def run_analysis(ticker, trade_date, analysts, result_holder,
+def run_analysis(ticker, trade_date, analysts,
                  quick_model="claude-cli", deep_model="claude-cli",
-                 output_language="English"):
+                 output_language="English", depth_cfg=None):
+    depth_cfg = depth_cfg or {"max_debate_rounds": 1, "max_risk_discuss_rounds": 1}
+
+    def _progress_cb(node_name: str):
+        label = _NODE_LABELS.get(node_name, node_name)
+        with _RUN_LOCK:
+            _RUN["progress"].append(label)
+
     try:
         from tradingagents.graph.trading_graph import TradingAgentsGraph
         from tradingagents.default_config import DEFAULT_CONFIG
         config = DEFAULT_CONFIG.copy()
-        config.update({"max_debate_rounds": 1, "max_risk_discuss_rounds": 1,
-                        "selected_analysts": analysts,
-                        "quick_think_llm": quick_model, "deep_think_llm": deep_model,
-                        "output_language": output_language})
+        config.update({
+            "selected_analysts": analysts,
+            "quick_think_llm": quick_model,
+            "deep_think_llm": deep_model,
+            "output_language": output_language,
+            **depth_cfg,
+        })
         ta = TradingAgentsGraph(debug=False, config=config)
-        final_state, signal = ta.propagate(ticker, str(trade_date))
+        final_state, signal = ta.propagate(ticker, str(trade_date), progress_cb=_progress_cb)
         from cli.main import save_report_to_disk, extract_and_save_summary
         for base in [config.get("results_dir_local"), config.get("results_dir")]:
             if base:
@@ -745,14 +784,20 @@ def run_analysis(ticker, trade_date, analysts, result_holder,
                     p = Path(base) / ticker / str(trade_date)
                     save_report_to_disk(final_state, ticker, p)
                     extract_and_save_summary(final_state, ticker, p)
-                except Exception: pass
-        result_holder.update({"state": final_state, "signal": signal, "error": None})
+                except Exception:
+                    pass
         try:
             from cli.main import _append_signal_log
             _append_signal_log(config, ticker, str(trade_date), signal)
-        except Exception: pass
+        except Exception:
+            pass
+        with _RUN_LOCK:
+            _RUN["result"] = {"state": final_state, "signal": signal, "error": None}
+            _RUN["done"] = True
     except Exception as e:
-        result_holder.update({"error": str(e), "state": None})
+        with _RUN_LOCK:
+            _RUN["result"] = {"error": str(e), "state": None}
+            _RUN["done"] = True
 
 
 # ── SIDEBAR ────────────────────────────────────────────────────────────────────
@@ -841,6 +886,23 @@ with st.sidebar:
         (["options"]      if use_options      else [])
     )
 
+    sac.divider(label="Depth", align="center", color="#333")
+    depth_choice = sac.segmented(
+        items=[
+            sac.SegmentedItem(label="⚡ Shallow"),
+            sac.SegmentedItem(label="⚖️ Standard"),
+            sac.SegmentedItem(label="🔬 Deep"),
+        ],
+        label=None, size="xs", color="#36cfc9", use_container_width=True,
+        index=1,
+    )
+    _depth_key = depth_choice or "⚖️ Standard"
+    selected_depth_cfg = _DEPTH_CFG.get(_depth_key, _DEPTH_CFG["⚖️ Standard"])
+    _depth_hint = {"⚡ Shallow": "1 debate · 1 risk round",
+                   "⚖️ Standard": "1 debate · 2 risk rounds",
+                   "🔬 Deep": "2 debates · 3 risk rounds"}
+    st.caption(_depth_hint.get(_depth_key, ""))
+
     sac.divider(label="Model", align="center", color="#333")
 
     from tradingagents.llm_clients.model_catalog import get_model_options
@@ -849,7 +911,7 @@ with st.sidebar:
     quick_model = dict(_qopts)[st.selectbox("Quick (analysts)", [l for l,_ in _qopts], index=0)]
     deep_model  = dict(_dopts)[st.selectbox("Deep (PM & research)", [l for l,_ in _dopts], index=0)]
 
-    sac.divider(label="Output Language", align="center", color="#333")
+    sac.divider(label="Language", align="center", color="#333")
     lang_choice = sac.segmented(
         items=[
             sac.SegmentedItem(label="🇺🇸 English"),
@@ -864,7 +926,7 @@ with st.sidebar:
 
     run_btn = st.button(
         "🚀  Run Analysis", use_container_width=True, type="primary",
-        disabled=not ticker or not selected_analysts,
+        disabled=not ticker or not selected_analysts or st.session_state.running,
     )
     if not selected_analysts:
         st.warning("Select at least one analyst.")
@@ -932,22 +994,38 @@ if _logo_b64:
     </div>
     """, unsafe_allow_html=True)
 
-# Run analysis
+# ── Kick off analysis ──────────────────────────────────────────────────────────
 if run_btn and not st.session_state.running:
-    st.session_state.result  = None
-    st.session_state.running = True
-    st.session_state.nav     = "New Analysis"
-    result_holder = {}
-    thread = threading.Thread(
+    _n_analysts = len(selected_analysts)
+    _dr = selected_depth_cfg.get("max_debate_rounds", 1)
+    _rr = selected_depth_cfg.get("max_risk_discuss_rounds", 1)
+    _total = _n_analysts + 2 * _dr + 1 + 1 + 3 * _rr + 1   # analysts+debate+trader+risk+PM
+    with _RUN_LOCK:
+        _RUN.update({"active": True, "progress": [], "result": None, "done": False, "error": None})
+    st.session_state.result        = None
+    st.session_state.running       = True
+    st.session_state.nav           = "New Analysis"
+    st.session_state._run_ticker   = ticker
+    st.session_state._run_date     = str(trade_date)
+    st.session_state._run_total    = _total
+    st.session_state._run_started  = time.time()
+    threading.Thread(
         target=run_analysis,
-        args=(ticker, trade_date, selected_analysts, result_holder, quick_model, deep_model, output_language),
+        args=(ticker, trade_date, selected_analysts, quick_model, deep_model,
+              output_language, selected_depth_cfg),
         daemon=True,
-    )
-    thread.start()
-    with st.spinner(f"Analyzing **{ticker}** on {trade_date}… (a few minutes)"):
-        thread.join(timeout=1200)
-    st.session_state.running = False
-    st.session_state.result  = result_holder
+    ).start()
+    st.rerun()
+
+# ── Poll for completion ─────────────────────────────────────────────────────────
+if st.session_state.running:
+    with _RUN_LOCK:
+        _done   = _RUN["done"]
+        _result = _RUN.get("result")
+    if _done:
+        st.session_state.running = False
+        st.session_state.result  = _result
+        st.rerun()
 
 # ── Page routing ───────────────────────────────────────────────────────────────
 page = st.session_state.nav
@@ -967,7 +1045,51 @@ else:
     # ── New Analysis page ──────────────────────────────────────────────────────
     result = st.session_state.result
 
-    if result is None:
+    if st.session_state.running:
+        # ── Live progress display ──────────────────────────────────────────────
+        with _RUN_LOCK:
+            _prog  = list(_RUN["progress"])
+        _total   = st.session_state.get("_run_total", 15)
+        _ticker  = st.session_state.get("_run_ticker", "")
+        _rdate   = st.session_state.get("_run_date", "")
+        _elapsed = int(time.time() - st.session_state.get("_run_started", time.time()))
+        _mins, _secs = divmod(_elapsed, 60)
+
+        st.markdown(
+            f"<h3 style='margin-bottom:4px;'>⏳ Analyzing <span style='color:#36cfc9'>{_ticker}</span>"
+            f" &nbsp;·&nbsp; {_rdate}</h3>"
+            f"<div style='color:var(--sl-muted);font-size:0.85rem;margin-bottom:16px;'>"
+            f"Elapsed: {_mins:02d}:{_secs:02d} &nbsp;·&nbsp; {len(_prog)}/{_total} steps</div>",
+            unsafe_allow_html=True,
+        )
+        st.progress(min(len(_prog) / max(_total, 1), 0.99))
+
+        if _prog:
+            # Completed steps
+            _done_html = "".join(
+                f"<div style='padding:3px 0;font-size:0.88rem;'>✅ {s}</div>"
+                for s in _prog[:-1]
+            )
+            # Current (last) step — animated
+            _done_html += (
+                f"<div style='padding:4px 0;font-size:0.92rem;font-weight:600;"
+                f"color:#36cfc9;'>⚙️ {_prog[-1]} &nbsp;<span style='opacity:0.6;font-size:0.8rem;'>running…</span></div>"
+            )
+            st.markdown(
+                f"<div style='border:1px solid var(--sl-border);border-radius:10px;"
+                f"padding:12px 18px;margin-top:8px;'>{_done_html}</div>",
+                unsafe_allow_html=True,
+            )
+        else:
+            st.markdown(
+                "<div style='color:var(--sl-muted);font-size:0.88rem;'>Initializing agents…</div>",
+                unsafe_allow_html=True,
+            )
+
+        time.sleep(2)
+        st.rerun()
+
+    elif result is None:
         # Landing — one row: illustration | How it works | Agent pipeline
         st.info("Configure your analysis in the sidebar and click **Run Analysis**.")
 

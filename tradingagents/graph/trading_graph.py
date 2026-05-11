@@ -293,7 +293,7 @@ class TradingAgentsGraph:
         if updates:
             self.memory_log.batch_update_with_outcomes(updates)
 
-    def propagate(self, company_name, trade_date):
+    def propagate(self, company_name, trade_date, progress_cb=None):
         """Run the trading agents graph for a company on a specific date.
 
         When ``checkpoint_enabled`` is set in config, the graph is recompiled
@@ -301,6 +301,7 @@ class TradingAgentsGraph:
         successful node on a subsequent invocation with the same ticker+date.
         """
         self.ticker = company_name
+        self._progress_cb = progress_cb
 
         # Resolve any pending memory-log entries for this ticker before the pipeline runs.
         self._resolve_pending_entries(company_name)
@@ -324,14 +325,14 @@ class TradingAgentsGraph:
                 logger.info("Starting fresh for %s on %s", company_name, trade_date)
 
         try:
-            return self._run_graph(company_name, trade_date)
+            return self._run_graph(company_name, trade_date, progress_cb=self._progress_cb)
         finally:
             if self._checkpointer_ctx is not None:
                 self._checkpointer_ctx.__exit__(None, None, None)
                 self._checkpointer_ctx = None
                 self.graph = self.workflow.compile()
 
-    def _run_graph(self, company_name, trade_date):
+    def _run_graph(self, company_name, trade_date, progress_cb=None):
         """Execute the graph and write the resulting state to disk and memory log."""
         # Initialize state — inject memory log context for PM.
         past_context = self.memory_log.get_past_context(company_name)
@@ -345,19 +346,24 @@ class TradingAgentsGraph:
             tid = thread_id(company_name, str(trade_date))
             args.setdefault("config", {}).setdefault("configurable", {})["thread_id"] = tid
 
-        if self.debug:
-            trace = []
-            for chunk in self.graph.stream(init_agent_state, **args):
-                if len(chunk["messages"]) == 0:
-                    pass
-                else:
-                    chunk["messages"][-1].pretty_print()
-                    trace.append(chunk)
-            # Streamed chunks are per-node deltas. Merge them so the returned
-            # state matches what graph.invoke() yields in the non-debug path.
-            final_state = {}
-            for chunk in trace:
-                final_state.update(chunk)
+        _skip = ("Msg Clear ", "tools_")
+
+        if progress_cb is not None or self.debug:
+            # stream_mode="updates" yields {node_name: {state_delta}} per node
+            merged = {}
+            for chunk in self.graph.stream(init_agent_state, stream_mode="updates", **args):
+                for node_name, delta in chunk.items():
+                    if self.debug:
+                        msgs = delta.get("messages", [])
+                        if msgs:
+                            msgs[-1].pretty_print()
+                    if progress_cb and not any(node_name.startswith(p) for p in _skip):
+                        try:
+                            progress_cb(node_name)
+                        except Exception:
+                            pass
+                    merged.update(delta)
+            final_state = merged
         else:
             final_state = self.graph.invoke(init_agent_state, **args)
 
