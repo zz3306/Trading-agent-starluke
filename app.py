@@ -150,18 +150,18 @@ def _get_reports_dir() -> Path:
 def _render_browse_reports():
     reports_dir = _get_reports_dir()
     if not reports_dir.exists():
-        sac.alert("No reports saved yet. Run an analysis first.", type="info", banner=False)
+        st.info("No reports saved yet. Run an analysis first.")
         return
     tickers = sorted([p.name for p in reports_dir.iterdir()
                       if p.is_dir() and p.name != "signal_log.csv"])
     if not tickers:
-        sac.alert("No reports saved yet.", type="info", banner=False)
+        st.info("No reports saved yet.")
         return
     selected_ticker = st.selectbox("Ticker", tickers)
     ticker_dir = reports_dir / selected_ticker
     dates = sorted([p.name for p in ticker_dir.iterdir() if p.is_dir()], reverse=True)
     if not dates:
-        sac.alert(f"No reports for {selected_ticker}.", type="info", banner=False)
+        st.info(f"No reports for {selected_ticker}.")
         return
     selected_date = st.selectbox("Date", dates)
     report_path = ticker_dir / selected_date / "complete_report.md"
@@ -177,13 +177,12 @@ def _render_signal_log():
     import pandas as pd
     log_path = _get_reports_dir() / "signal_log.csv"
     if not log_path.exists():
-        sac.alert("No signals logged yet. Signal log is created after your first analysis.",
-                  type="info", banner=False)
+        st.info("No signals logged yet. Signal log is created after your first analysis.")
         return
     try:
         df = pd.read_csv(log_path)
         if df.empty:
-            sac.alert("Signal log is empty.", type="info", banner=False)
+            st.info("Signal log is empty.")
             return
         def color_signal(val):
             if val == "BUY":  return "color:#00e676;font-weight:bold"
@@ -197,7 +196,7 @@ def _render_signal_log():
         c3.metric("SELL", int((df.signal == "SELL").sum()))
         c4.metric("HOLD", int((df.signal == "HOLD").sum()))
     except Exception as e:
-        sac.alert(f"Could not read signal log: {e}", type="error", banner=False)
+        st.error(f"Could not read signal log: {e}")
 
 def run_analysis(ticker, trade_date, analysts, result_holder,
                  quick_model="claude-cli", deep_model="claude-cli"):
@@ -292,7 +291,7 @@ with st.sidebar:
         disabled=not ticker or not selected_analysts,
     )
     if not selected_analysts:
-        sac.alert("Select at least one analyst.", type="warning", banner=False)
+        st.warning("Select at least one analyst.")
 
     st.markdown("<div style='height:4px'></div>", unsafe_allow_html=True)
     st.caption("💡 First run ~3–5 min · Results auto-saved to reports/")
@@ -342,10 +341,7 @@ else:
 
     if result is None:
         # Landing
-        sac.alert(
-            "Configure your analysis in the sidebar and click **Run Analysis**.",
-            type="info", banner=False,
-        )
+        st.info("Configure your analysis in the sidebar and click **Run Analysis**.")
         col1, col2 = st.columns(2)
         with col1:
             st.markdown("""
@@ -372,7 +368,7 @@ Macro   ┘       Trader
             """)
 
     elif result.get("error"):
-        sac.alert(f"Analysis failed: {result['error']}", type="error", banner=True)
+        st.error(f"Analysis failed: {result['error']}")
 
     else:
         state  = result["state"]
