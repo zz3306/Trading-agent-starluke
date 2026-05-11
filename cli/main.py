@@ -28,6 +28,19 @@ from rich.align import Align
 from rich.rule import Rule
 from rich.console import Group as RichGroup
 
+import sys, io, os
+
+# Force UTF-8 on Windows so emoji / CJK in help text don't crash cp1252.
+if sys.platform == "win32":
+    os.environ.setdefault("PYTHONUTF8", "1")
+    try:
+        if hasattr(sys.stdout, "reconfigure"):
+            sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        if hasattr(sys.stderr, "reconfigure"):
+            sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
 from tradingagents.graph.trading_graph import TradingAgentsGraph
 from tradingagents.default_config import DEFAULT_CONFIG
 from cli.models import AnalystType
@@ -35,7 +48,14 @@ from cli.utils import *  # includes select_claude_cli_models
 from cli.announcements import fetch_announcements, display_announcements
 from cli.stats_handler import StatsCallbackHandler
 
-console = Console()
+# Use force_terminal=True so rich renders properly; no_color fallback for
+# environments that still can't handle Unicode.
+try:
+    console = Console(force_terminal=True)
+    # Quick probe: try encoding a known emoji
+    "★".encode(console.file.encoding if hasattr(console.file, "encoding") else "utf-8")
+except (UnicodeEncodeError, Exception):
+    console = Console(no_color=True, highlight=False)
 
 app = typer.Typer(
     name="STARLUKE",
@@ -1395,7 +1415,7 @@ def saas_finder_cmd(
     model: str = typer.Option("claude-sonnet-4-6", "--model", "-m", help="Claude model to use"),
     no_save: bool = typer.Option(False, "--no-save", help="Skip saving results to disk"),
 ):
-    """Find top SaaS companies by 护城河四维度 (Four-Dimension Moat) score."""
+    """Find top SaaS companies by Four-Dimension Moat score (Distribution / Data / Integration / Regulatory)."""
     from tradingagents.saas_finder import run_saas_finder
 
     rainbow_title = make_rainbow_text("  ★  STARLUKE SaaS Finder  ★  ")
