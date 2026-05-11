@@ -1503,5 +1503,151 @@ def saas_finder_cmd(
         console.print("\n[green]✓ Results saved to reports/saas_finder/[/green]")
 
 
+@app.command(name="report")
+def report_cmd(
+    ticker: Optional[str] = typer.Argument(None, help="Stock ticker (e.g. AAPL). Omit for interactive selection."),
+    date: Optional[str] = typer.Option(None, "--date", "-d", help="Report date YYYY-MM-DD. Omit for interactive selection."),
+):
+    """Browse and view saved analysis reports in the terminal."""
+    import json as _json
+
+    from tradingagents.default_config import DEFAULT_CONFIG
+    results_dir = Path(DEFAULT_CONFIG["results_dir"])
+
+    if not results_dir.exists():
+        console.print("[yellow]No reports directory found. Run 'analyze' first.[/yellow]")
+        raise typer.Exit(0)
+
+    # ── Pick ticker ────────────────────────────────────────────────────────────
+    tickers = sorted([
+        p.name for p in results_dir.iterdir()
+        if p.is_dir() and p.name not in ("signal_log.csv", "saas_finder")
+    ])
+    if not tickers:
+        console.print("[yellow]No reports found yet. Run 'analyze' first.[/yellow]")
+        raise typer.Exit(0)
+
+    if ticker is None:
+        ticker = questionary.select("Select ticker:", choices=tickers).ask()
+        if ticker is None:
+            raise typer.Exit(0)
+    elif ticker.upper() not in tickers:
+        console.print(f"[red]Ticker '{ticker}' not found. Available: {', '.join(tickers)}[/red]")
+        raise typer.Exit(1)
+    else:
+        ticker = ticker.upper()
+
+    ticker_dir = results_dir / ticker
+
+    # ── Pick date ──────────────────────────────────────────────────────────────
+    dates = sorted([
+        p.name for p in ticker_dir.iterdir()
+        if p.is_dir() and p.name not in ("TradingAgentsStrategy_logs",)
+    ], reverse=True)
+    if not dates:
+        console.print(f"[yellow]No dated reports for {ticker}.[/yellow]")
+        raise typer.Exit(0)
+
+    if date is None:
+        date = questionary.select(f"Select date for {ticker}:", choices=dates).ask()
+        if date is None:
+            raise typer.Exit(0)
+    elif date not in dates:
+        console.print(f"[red]Date '{date}' not found for {ticker}. Available: {', '.join(dates)}[/red]")
+        raise typer.Exit(1)
+
+    report_dir = ticker_dir / date
+
+    # ── Load summary ───────────────────────────────────────────────────────────
+    summary_path = report_dir / "summary.json"
+    summary: dict = {}
+    if summary_path.exists():
+        try:
+            summary = _json.loads(summary_path.read_bytes().decode("utf-8"))
+        except Exception:
+            pass
+
+    # ── Header ─────────────────────────────────────────────────────────────────
+    signal = summary.get("signal", "?")
+    sig_color = {"BUY": "green", "SELL": "red", "HOLD": "yellow"}.get(signal, "white")
+    generated = summary.get("generated_at", "")
+
+    console.print()
+    console.print(Rule(f"[bold]{ticker}[/bold]  ·  {date}  ·  [{sig_color}]● {signal}[/{sig_color}]", style="cyan"))
+    if generated:
+        console.print(f"[dim]Generated: {generated}[/dim]")
+    console.print()
+
+    # ── Try complete_report.md first (richest content) ─────────────────────────
+    md_path = report_dir / "complete_report.md"
+    if md_path.exists():
+        try:
+            md_text = md_path.read_bytes().decode("utf-8")
+            console.print(Markdown(md_text))
+            raise typer.Exit(0)
+        except typer.Exit:
+            raise
+        except Exception:
+            pass  # fall through to summary display
+
+    # ── Fallback: render from summary.json fields ──────────────────────────────
+    _SECTIONS = [
+        ("analysts",         "📊 Analyst Reports"),
+        ("bull_thesis",      "🟢 Bull Case"),
+        ("bear_thesis",      "🔴 Bear Case"),
+        ("research_plan",    "👔 Research Decision"),
+        ("trader_plan",      "🤝 Trader Plan"),
+        ("risk_aggressive",  "🔴 Risk · Aggressive"),
+        ("risk_conservative","🟢 Risk · Conservative"),
+        ("risk_neutral",     "🟡 Risk · Neutral"),
+        ("final_decision",   "🏆 Portfolio Manager"),
+    ]
+
+    # interactive section pick
+    available = [label for key, label in _SECTIONS if summary.get(key)]
+    section_choice = questionary.select(
+        "View section:",
+        choices=["[All sections]"] + available,
+    ).ask()
+    if section_choice is None:
+        raise typer.Exit(0)
+
+    def _print_section(key: str, label: str):
+        val = summary.get(key)
+        if not val:
+            return
+        if isinstance(val, dict):
+            for sub_key, sub_val in val.items():
+                console.print(Panel(
+                    Markdown(str(sub_val)),
+                    title=f"[bold]{label} · {sub_key}[/bold]",
+                    border_style="dim",
+                    padding=(1, 2),
+                ))
+        else:
+            console.print(Panel(
+                Markdown(str(val)),
+                title=f"[bold]{label}[/bold]",
+                border_style="dim",
+                padding=(1, 2),
+            ))
+
+    if section_choice == "[All sections]":
+        for key, label in _SECTIONS:
+            _print_section(key, label)
+    else:
+        for key, label in _SECTIONS:
+            if label == section_choice:
+                _print_section(key, label)
+                break
+
+
+def key_for_label(sections, label):
+    for k, l in sections:
+        if l == label:
+            return k
+    return ""
+
+
 if __name__ == "__main__":
     app()
