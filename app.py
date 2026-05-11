@@ -1287,8 +1287,26 @@ if run_btn and not st.session_state.running:
     _dr = selected_depth_cfg.get("max_debate_rounds", 1)
     _rr = selected_depth_cfg.get("max_risk_discuss_rounds", 1)
     _total = _n_analysts + 2 * _dr + 1 + 1 + 3 * _rr + 1
+
+    # Build the expected node order so the UI can show "currently running X"
+    # even before any callbacks fire (each analyst takes 10-20 min on first run).
+    _analyst_label_map = {
+        "market": "📈 Market Analyst", "news": "📰 News Analyst",
+        "fundamentals": "🏢 Fundamentals Analyst", "valuation": "🔢 Valuation Analyst",
+        "macro": "🌐 Macro Analyst", "social": "💬 Social Analyst",
+        "options": "💵 Options Analyst",
+    }
+    _pipeline = (
+        [_analyst_label_map.get(a, a.capitalize()) for a in selected_analysts]
+        + ["🟢 Bull Researcher", "🔴 Bear Researcher"] * _dr
+        + ["👔 Research Manager", "🤝 Trader"]
+        + ["🔴 Risk · Aggressive", "🟢 Risk · Conservative", "🟡 Risk · Neutral"] * _rr
+        + ["🏆 Portfolio Manager"]
+    )
+
     with _RUN_LOCK:
-        _RUN.update({"active": True, "progress": [], "result": None, "done": False, "error": None})
+        _RUN.update({"active": True, "progress": [], "result": None, "done": False,
+                     "error": None, "pipeline": _pipeline})
     st.session_state.result       = None
     st.session_state.running      = True
     st.session_state.nav          = "New Analysis"
@@ -1334,12 +1352,17 @@ else:
 
     if st.session_state.running:
         with _RUN_LOCK:
-            _prog = list(_RUN["progress"])
+            _prog     = list(_RUN["progress"])
+            _pipeline = list(_RUN.get("pipeline", []))
         _total   = st.session_state.get("_run_total", 15)
         _ticker  = st.session_state.get("_run_ticker", "")
         _rdate   = st.session_state.get("_run_date", "")
         _elapsed = int(time.time() - st.session_state.get("_run_started", time.time()))
         _mins, _secs = divmod(_elapsed, 60)
+
+        # Which node is currently running = next one after all completed ones
+        _n_done = len(_prog)
+        _current_node = _pipeline[_n_done] if _n_done < len(_pipeline) else None
 
         # Wrap all dynamic content in a single st.empty() so Streamlit
         # replaces ONE node on each rerun instead of removing/adding several
@@ -1350,23 +1373,26 @@ else:
                 f"<h3 style='margin-bottom:4px;'>⏳ {t('analyzing')} <span style='color:#36cfc9'>{_ticker}</span>"
                 f" &nbsp;·&nbsp; {_rdate}</h3>"
                 f"<div style='color:var(--sl-muted);font-size:0.85rem;margin-bottom:16px;'>"
-                f"{t('elapsed')}: {_mins:02d}:{_secs:02d} &nbsp;·&nbsp; {len(_prog)}/{_total} {t('steps')}</div>",
+                f"{t('elapsed')}: {_mins:02d}:{_secs:02d} &nbsp;·&nbsp; {_n_done}/{_total} {t('steps')}</div>",
                 unsafe_allow_html=True,
             )
-            st.progress(min(len(_prog) / max(_total, 1), 0.99))
+            st.progress(min(_n_done / max(_total, 1), 0.99))
 
-            if _prog:
-                _done_html = "".join(
-                    f"<div style='padding:3px 0;font-size:0.88rem;'>✅ {s}</div>"
-                    for s in _prog[:-1]
-                )
-                _done_html += (
+            # Build step list: completed ✅ + current ⚙️ (from pipeline, even before callback fires)
+            _rows = "".join(
+                f"<div style='padding:3px 0;font-size:0.88rem;'>✅ {s}</div>"
+                for s in _prog
+            )
+            if _current_node:
+                _rows += (
                     f"<div style='padding:4px 0;font-size:0.92rem;font-weight:600;"
-                    f"color:#36cfc9;'>⚙️ {_prog[-1]} &nbsp;<span style='opacity:0.6;font-size:0.8rem;'>running…</span></div>"
+                    f"color:#36cfc9;'>⚙️ {_current_node}"
+                    f" &nbsp;<span style='opacity:0.6;font-size:0.8rem;'>running…</span></div>"
                 )
+            if _rows:
                 st.markdown(
                     f"<div style='border:1px solid var(--sl-border);border-radius:10px;"
-                    f"padding:12px 18px;margin-top:8px;'>{_done_html}</div>",
+                    f"padding:12px 18px;margin-top:8px;'>{_rows}</div>",
                     unsafe_allow_html=True,
                 )
             else:
