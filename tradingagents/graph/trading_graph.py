@@ -403,36 +403,35 @@ class TradingAgentsGraph:
 
     def _log_state(self, trade_date, final_state):
         """Log the final state to a JSON file."""
+        _ids = final_state.get("investment_debate_state") or {}
+        _rds = final_state.get("risk_debate_state") or {}
         self.log_states_dict[str(trade_date)] = {
-            "company_of_interest": final_state["company_of_interest"],
-            "trade_date": final_state["trade_date"],
-            "market_report": final_state["market_report"],
-            "sentiment_report": final_state["sentiment_report"],
-            "news_report": final_state["news_report"],
-            "fundamentals_report": final_state["fundamentals_report"],
-            "valuation_report": final_state.get("valuation_report", ""),
-            "options_report": final_state.get("options_report", ""),
+            "company_of_interest": final_state.get("company_of_interest", ""),
+            "trade_date":          final_state.get("trade_date", str(trade_date)),
+            "market_report":       final_state.get("market_report", ""),
+            "sentiment_report":    final_state.get("sentiment_report", ""),
+            "news_report":         final_state.get("news_report", ""),
+            "fundamentals_report": final_state.get("fundamentals_report", ""),
+            "valuation_report":    final_state.get("valuation_report", ""),
+            "macro_report":        final_state.get("macro_report", ""),
+            "options_report":      final_state.get("options_report", ""),
             "investment_debate_state": {
-                "bull_history": final_state["investment_debate_state"]["bull_history"],
-                "bear_history": final_state["investment_debate_state"]["bear_history"],
-                "history": final_state["investment_debate_state"]["history"],
-                "current_response": final_state["investment_debate_state"][
-                    "current_response"
-                ],
-                "judge_decision": final_state["investment_debate_state"][
-                    "judge_decision"
-                ],
+                "bull_history":     _ids.get("bull_history", ""),
+                "bear_history":     _ids.get("bear_history", ""),
+                "history":          _ids.get("history", ""),
+                "current_response": _ids.get("current_response", ""),
+                "judge_decision":   _ids.get("judge_decision", ""),
             },
-            "trader_investment_decision": final_state["trader_investment_plan"],
+            "trader_investment_decision": final_state.get("trader_investment_plan", ""),
             "risk_debate_state": {
-                "aggressive_history": final_state["risk_debate_state"]["aggressive_history"],
-                "conservative_history": final_state["risk_debate_state"]["conservative_history"],
-                "neutral_history": final_state["risk_debate_state"]["neutral_history"],
-                "history": final_state["risk_debate_state"]["history"],
-                "judge_decision": final_state["risk_debate_state"]["judge_decision"],
+                "aggressive_history":  _rds.get("aggressive_history", ""),
+                "conservative_history": _rds.get("conservative_history", ""),
+                "neutral_history":     _rds.get("neutral_history", ""),
+                "history":             _rds.get("history", ""),
+                "judge_decision":      _rds.get("judge_decision", ""),
             },
-            "investment_plan": final_state["investment_plan"],
-            "final_trade_decision": final_state["final_trade_decision"],
+            "investment_plan":      final_state.get("investment_plan", ""),
+            "final_trade_decision": final_state.get("final_trade_decision", ""),
         }
 
         # Save to file. Reject ticker values that would escape the
