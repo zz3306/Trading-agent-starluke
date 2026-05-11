@@ -346,53 +346,67 @@ class TradingAgentsGraph:
             tid = thread_id(company_name, str(trade_date))
             args.setdefault("config", {}).setdefault("configurable", {})["thread_id"] = tid
 
-        _skip = ("Msg Clear ", "tools_")
-
         if progress_cb is not None or self.debug:
-            # Try streaming with updates mode for live progress.
-            # Falls back to graph.invoke() if streaming fails or produces
-            # an incomplete state (e.g. older LangGraph without stream_mode="updates").
-            _stream_ok = False
-            try:
-                merged = dict(init_agent_state)
-                for chunk in self.graph.stream(
-                    init_agent_state, stream_mode="updates", **args
-                ):
-                    for node_name, delta in chunk.items():
-                        if not isinstance(delta, dict):
-                            continue
-                        if self.debug:
-                            msgs = delta.get("messages", [])
-                            if msgs:
-                                msgs[-1].pretty_print()
-                        if progress_cb and not any(
-                            node_name.startswith(p) for p in _skip
-                        ):
+            # Use default stream mode ("values") — yields the full state after each
+            # node, same as the original debug path. We infer which node just ran by
+            # watching which report fields change between consecutive states.
+            _FIELD_NODE = {
+                "market_report":          "Market Analyst",
+                "news_report":            "News Analyst",
+                "sentiment_report":       "Social Analyst",
+                "fundamentals_report":    "Fundamentals Analyst",
+                "valuation_report":       "Valuation Analyst",
+                "macro_report":           "Macro Analyst",
+                "options_report":         "Options Analyst",
+                "research_report":        "Research Manager",
+                "trader_investment_plan": "Trader",
+                "final_trade_decision":   "Portfolio Manager",
+            }
+            _debate_count = 0
+            _risk_count   = 0
+            prev          = {}
+            final_state   = None
+
+            for chunk in self.graph.stream(init_agent_state, **args):
+                if self.debug:
+                    msgs = chunk.get("messages", [])
+                    if msgs:
+                        msgs[-1].pretty_print()
+
+                if progress_cb:
+                    fired = False
+                    # Simple string-field changes → analyst nodes
+                    for field, node_name in _FIELD_NODE.items():
+                        if chunk.get(field) and not prev.get(field):
                             try:
                                 progress_cb(node_name)
                             except Exception:
                                 pass
-                        # Merge non-message fields; messages managed by LangGraph.
-                        for k, v in delta.items():
-                            if k != "messages":
-                                merged[k] = v
-                if merged.get("final_trade_decision"):
-                    final_state = merged
-                    _stream_ok = True
-            except Exception as _stream_err:
-                logger.warning(
-                    "Graph streaming failed (%r) — falling back to invoke()",
-                    _stream_err,
-                )
+                            fired = True
+                            break
+                    if not fired:
+                        # Debate state change → bull or bear
+                        if chunk.get("investment_debate_state") != prev.get("investment_debate_state"):
+                            _debate_count += 1
+                            node = "Bull Researcher" if _debate_count % 2 == 1 else "Bear Researcher"
+                            try:
+                                progress_cb(node)
+                            except Exception:
+                                pass
+                        # Risk state change → one of the three risk analysts
+                        elif chunk.get("risk_debate_state") != prev.get("risk_debate_state"):
+                            _risk_count += 1
+                            _risk_nodes = ["Aggressive Analyst", "Neutral Analyst", "Conservative Analyst"]
+                            try:
+                                progress_cb(_risk_nodes[(_risk_count - 1) % 3])
+                            except Exception:
+                                pass
 
-            if not _stream_ok:
-                # Reliable fallback — progress tracking won't fire for remaining steps
-                if progress_cb:
-                    try:
-                        progress_cb("Portfolio Manager")  # signal we're in final step
-                    except Exception:
-                        pass
-                final_state = self.graph.invoke(init_agent_state, **args)
+                prev        = chunk
+                final_state = chunk
+
+            if final_state is None:
+                raise RuntimeError("Graph stream produced no output")
         else:
             final_state = self.graph.invoke(init_agent_state, **args)
 
