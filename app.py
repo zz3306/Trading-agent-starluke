@@ -4,6 +4,7 @@ Run: streamlit run app.py
 """
 
 import base64
+import json
 import os
 import threading
 from datetime import date, timedelta
@@ -18,9 +19,11 @@ def _img_b64(name: str) -> str:
     p = Path(__file__).parent / "assets" / name
     return base64.b64encode(p.read_bytes()).decode() if p.exists() else ""
 
-_logo_b64   = _img_b64("Starluke.png")
-_bg_b64     = _img_b64("Cominc3.png")
-_illus_b64  = _img_b64("1.png")
+_logo_b64     = _img_b64("Starluke.png")
+_desert_bg_b64 = _img_b64("Cominc3.png")
+_rock_bg_b64  = _img_b64("comic7.png")
+_light_bg_b64 = _img_b64("微信图片_20260424015903_165_2.jpg")
+_illus_b64    = _img_b64("1.png")
 
 # ── Page config ────────────────────────────────────────────────────────────────
 st.set_page_config(
@@ -47,50 +50,56 @@ _COMMON_CSS = """
 [data-testid="stDataFrame"] { border-radius:8px !important; }
 """
 
-DARK_CSS = _COMMON_CSS + """
-:root { --sl-border:#222; --sl-muted:#555; }
-html,body,[data-testid="stAppViewContainer"],[data-testid="stMain"]
-    { background-color:#0f0f0f !important; color:#e8e8e8 !important; }
-[data-testid="stSidebar"] { background-color:#141414 !important; border-right:1px solid #222 !important; padding-top:0 !important; }
+ROCK_CSS = _COMMON_CSS + """
+:root { --sl-border:#222; --sl-muted:#888; }
+html,body { background-color:#080808 !important; color:#f0f0f0 !important; }
+[data-testid="stAppViewContainer"],[data-testid="stMain"]
+    { background-color:transparent !important; color:#f0f0f0 !important; }
+/* dark scrim over main content for readability */
+[data-testid="stMain"] { background-color:rgba(0,0,0,0.62) !important; }
+[data-testid="stSidebar"] { background-color:rgba(8,8,8,0.82) !important; border-right:1px solid #333 !important; padding-top:0 !important; }
 [data-testid="stTextInput"] input,[data-testid="stDateInput"] input
-    { background:#1a1a1a !important; border:1px solid #2a2a2a !important; color:#e8e8e8 !important; border-radius:6px !important; }
-[data-testid="stSelectbox"]>div>div { background:#1a1a1a !important; border:1px solid #2a2a2a !important; color:#e8e8e8 !important; }
+    { background:#1c1c1c !important; border:1px solid #333 !important; color:#f0f0f0 !important; border-radius:6px !important; }
+[data-testid="stSelectbox"]>div>div { background:#1c1c1c !important; border:1px solid #333 !important; color:#f0f0f0 !important; }
 [data-testid="stButton"] button[kind="primary"]
     { background:linear-gradient(135deg,#36cfc9,#0d9e99) !important; border:none !important; color:#050505 !important;
       font-weight:700 !important; border-radius:8px !important; box-shadow:0 0 16px #36cfc944 !important; }
 [data-testid="stButton"] button[kind="primary"]:hover { box-shadow:0 0 28px #36cfc966 !important; }
-[data-testid="stMarkdownContainer"] { color:#ccc !important; }
-[data-testid="stMarkdownContainer"] h1,[data-testid="stMarkdownContainer"] h2,[data-testid="stMarkdownContainer"] h3 { color:#36cfc9 !important; }
+[data-testid="stMarkdownContainer"] { color:#e8e8e8 !important; }
+[data-testid="stMarkdownContainer"] h1,[data-testid="stMarkdownContainer"] h2,[data-testid="stMarkdownContainer"] h3 { color:#36cfc9 !important; text-shadow:0 1px 8px #000a; }
 [data-testid="stMarkdownContainer"] th { background:#1a1a1a !important; color:#36cfc9 !important; }
 [data-testid="stMarkdownContainer"] tr:nth-child(even) td { background:#161616 !important; }
-[data-testid="stCheckbox"] label { color:#aaa !important; }
-[data-testid="stCaptionContainer"] { color:#555 !important; }
-hr { border-color:#222 !important; }
-.sig-buy  { background:#00e67608; border:2px solid #00e676; color:#00e676; box-shadow:0 0 28px #00e67618; }
-.sig-sell { background:#ff174408; border:2px solid #ff1744; color:#ff1744; box-shadow:0 0 28px #ff174418; }
-.sig-hold { background:#ffb80008; border:2px solid #ffb800; color:#ffb800; box-shadow:0 0 28px #ffb80018; }
+[data-testid="stCheckbox"] label { color:#ddd !important; }
+[data-testid="stCaptionContainer"] { color:#888 !important; }
+hr { border-color:#333 !important; }
+.sig-buy  { background:#00e67612; border:2px solid #00e676; color:#00e676; box-shadow:0 0 28px #00e67630; }
+.sig-sell { background:#ff174412; border:2px solid #ff1744; color:#ff1744; box-shadow:0 0 28px #ff174430; }
+.sig-hold { background:#ffb80012; border:2px solid #ffb800; color:#ffb800; box-shadow:0 0 28px #ffb80030; }
 """
 
 LIGHT_CSS = _COMMON_CSS + """
 :root { --sl-border:#e0e4ea; --sl-muted:#8a8fa8; }
-html,body,[data-testid="stAppViewContainer"],[data-testid="stMain"]
-    { background-color:#f4f6f9 !important; color:#1a1a2e !important; }
-[data-testid="stSidebar"] { background-color:#ffffff !important; border-right:1px solid #e0e4ea !important; padding-top:0 !important; box-shadow:2px 0 8px #0001; }
-[data-testid="stSidebar"] * { color:#2a2a3e !important; }
+html,body { background-color:#e8edf5 !important; color:#0a0a1e !important; }
+[data-testid="stAppViewContainer"],[data-testid="stMain"]
+    { background-color:transparent !important; color:#0a0a1e !important; }
+/* light scrim for readability over bg image */
+[data-testid="stMain"] { background-color:rgba(240,244,252,0.72) !important; }
+[data-testid="stSidebar"] { background-color:rgba(255,255,255,0.88) !important; border-right:1px solid #d0d4e0 !important; padding-top:0 !important; box-shadow:2px 0 12px #0002; }
+[data-testid="stSidebar"] * { color:#1a1a2e !important; }
 [data-testid="stTextInput"] input,[data-testid="stDateInput"] input
-    { background:#fff !important; border:1px solid #d0d4dc !important; color:#1a1a2e !important; border-radius:6px !important; }
-[data-testid="stSelectbox"]>div>div { background:#fff !important; border:1px solid #d0d4dc !important; color:#1a1a2e !important; }
+    { background:#fff !important; border:1px solid #c0c6d8 !important; color:#0a0a1e !important; border-radius:6px !important; }
+[data-testid="stSelectbox"]>div>div { background:#fff !important; border:1px solid #c0c6d8 !important; color:#0a0a1e !important; }
 [data-testid="stButton"] button[kind="primary"]
     { background:linear-gradient(135deg,#0066cc,#004fa3) !important; border:none !important; color:#fff !important;
       font-weight:700 !important; border-radius:8px !important; box-shadow:0 2px 12px #0066cc33 !important; }
 [data-testid="stButton"] button[kind="primary"]:hover { box-shadow:0 4px 20px #0066cc55 !important; }
-[data-testid="stMarkdownContainer"] { color:#2a2a3e !important; }
-[data-testid="stMarkdownContainer"] h1,[data-testid="stMarkdownContainer"] h2,[data-testid="stMarkdownContainer"] h3 { color:#0052a3 !important; }
-[data-testid="stMarkdownContainer"] th { background:#eaf1fb !important; color:#0052a3 !important; }
-[data-testid="stMarkdownContainer"] tr:nth-child(even) td { background:#f8fafc !important; }
-[data-testid="stCheckbox"] label { color:#3a3a5e !important; }
-[data-testid="stCaptionContainer"] { color:#8a8fa8 !important; }
-hr { border-color:#e0e4ea !important; }
+[data-testid="stMarkdownContainer"] { color:#0d0d2a !important; }
+[data-testid="stMarkdownContainer"] h1,[data-testid="stMarkdownContainer"] h2,[data-testid="stMarkdownContainer"] h3 { color:#0044aa !important; font-weight:700 !important; }
+[data-testid="stMarkdownContainer"] th { background:#dce8f8 !important; color:#003d99 !important; font-weight:700 !important; }
+[data-testid="stMarkdownContainer"] tr:nth-child(even) td { background:#f0f4fc !important; }
+[data-testid="stCheckbox"] label { color:#1a1a3e !important; font-weight:500 !important; }
+[data-testid="stCaptionContainer"] { color:#5a6080 !important; }
+hr { border-color:#c8d0e0 !important; }
 .sig-buy  { background:#e6f9f0; border:2px solid #00843d; color:#00843d; box-shadow:0 2px 12px #00843d22; }
 .sig-sell { background:#fdecea; border:2px solid #c0392b; color:#c0392b; box-shadow:0 2px 12px #c0392b22; }
 .sig-hold { background:#fef8e7; border:2px solid #d4780a; color:#d4780a; box-shadow:0 2px 12px #d4780a22; }
@@ -104,9 +113,12 @@ RAINBOW_CSS = _COMMON_CSS + """
 @keyframes rborder { 0%{border-color:#ff3333;box-shadow:0 0 28px #ff333430}
   25%{border-color:#3366ff;box-shadow:0 0 28px #3366ff30} 50%{border-color:#33cc44;box-shadow:0 0 28px #33cc4430}
   75%{border-color:#ffdd00;box-shadow:0 0 28px #ffdd0030} 100%{border-color:#ff3333;box-shadow:0 0 28px #ff333430} }
-html,body,[data-testid="stAppViewContainer"],[data-testid="stMain"]
-    { background-color:#090909 !important; color:#efefef !important; }
-[data-testid="stSidebar"] { background-color:#0d0d0d !important; border-right:1px solid #1f1f1f !important; padding-top:0 !important; }
+html,body { background-color:#090909 !important; color:#f0f0f0 !important; }
+[data-testid="stAppViewContainer"],[data-testid="stMain"]
+    { background-color:transparent !important; color:#f0f0f0 !important; }
+/* dark scrim for readability */
+[data-testid="stMain"] { background-color:rgba(0,0,0,0.62) !important; }
+[data-testid="stSidebar"] { background-color:rgba(10,10,10,0.85) !important; border-right:1px solid #2a2a2a !important; padding-top:0 !important; }
 [data-testid="stSidebar"] img { animation:rglow 4s ease-in-out infinite; }
 [data-testid="stTextInput"] input,[data-testid="stDateInput"] input
     { background:#141414 !important; border:1px solid #2a2a2a !important; color:#efefef !important; border-radius:6px !important; }
@@ -129,33 +141,88 @@ hr { border-color:#1f1f1f !important; }
 .sig-hold { background:#1a1600; border:2px solid #ffdd00; color:#ffdd00; box-shadow:0 0 28px #ffdd0030; }
 """
 
+DESERT_CSS = _COMMON_CSS + """
+:root { --sl-border:#c8a97a; --sl-muted:#9a7a50; }
+html,body { background-color:#f7ede0 !important; color:#2c1a08 !important; }
+[data-testid="stAppViewContainer"],[data-testid="stMain"]
+    { background-color:transparent !important; color:#1a0a00 !important; }
+/* warm scrim over bg image */
+[data-testid="stMain"] { background-color:rgba(245,235,215,0.70) !important; }
+[data-testid="stSidebar"] { background-color:rgba(253,244,232,0.90) !important; border-right:1px solid #c8a97a !important; padding-top:0 !important; box-shadow:2px 0 10px #b8813030; }
+[data-testid="stSidebar"] * { color:#2c1a08 !important; }
+[data-testid="stTextInput"] input,[data-testid="stDateInput"] input
+    { background:#fffaf4 !important; border:1px solid #b89060 !important; color:#1a0a00 !important; border-radius:6px !important; }
+[data-testid="stSelectbox"]>div>div { background:#fffaf4 !important; border:1px solid #b89060 !important; color:#1a0a00 !important; }
+[data-testid="stButton"] button[kind="primary"]
+    { background:linear-gradient(135deg,#c47c2b,#a05a14) !important; border:none !important; color:#fff !important;
+      font-weight:700 !important; border-radius:8px !important; box-shadow:0 2px 12px #c47c2b55 !important; }
+[data-testid="stButton"] button[kind="primary"]:hover { box-shadow:0 4px 20px #c47c2b88 !important; }
+[data-testid="stMarkdownContainer"] { color:#1a0a00 !important; }
+[data-testid="stMarkdownContainer"] h1,[data-testid="stMarkdownContainer"] h2,[data-testid="stMarkdownContainer"] h3 { color:#7a3010 !important; font-weight:700 !important; }
+[data-testid="stMarkdownContainer"] th { background:#e8d0a8 !important; color:#7a3010 !important; font-weight:700 !important; }
+[data-testid="stMarkdownContainer"] tr:nth-child(even) td { background:#f5ead8 !important; }
+[data-testid="stCheckbox"] label { color:#3a2010 !important; font-weight:500 !important; }
+[data-testid="stCaptionContainer"] { color:#8a6040 !important; }
+hr { border-color:#c8a97a !important; }
+.sig-buy  { background:#e8f5e2; border:2px solid #2d7a1e; color:#1a5010; box-shadow:0 2px 12px #2d7a1e33; }
+.sig-sell { background:#f5e8e8; border:2px solid #a02020; color:#7a1010; box-shadow:0 2px 12px #a0202033; }
+.sig-hold { background:#fdf0d0; border:2px solid #c47c2b; color:#7a4010; box-shadow:0 2px 12px #c47c2b33; }
+"""
+
+# ── Persistent preferences ─────────────────────────────────────────────────────
+_PREFS_FILE = Path(__file__).parent / ".starluke_prefs.json"
+
+def _load_prefs() -> dict:
+    try:
+        return json.loads(_PREFS_FILE.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+
+def _save_prefs(**kwargs) -> None:
+    try:
+        prefs = _load_prefs()
+        prefs.update(kwargs)
+        _PREFS_FILE.write_text(json.dumps(prefs, ensure_ascii=False, indent=2), encoding="utf-8")
+    except Exception:
+        pass
+
+_prefs = _load_prefs()
+
 # ── Session state ──────────────────────────────────────────────────────────────
-if "theme"         not in st.session_state: st.session_state.theme         = "dark"
+if "theme"         not in st.session_state: st.session_state.theme         = _prefs.get("theme", "rock")
 if "result"        not in st.session_state: st.session_state.result        = None
 if "running"       not in st.session_state: st.session_state.running       = False
 if "nav"           not in st.session_state: st.session_state.nav           = "New Analysis"
-if "username"      not in st.session_state: st.session_state.username      = ""
+if "username"      not in st.session_state: st.session_state.username      = _prefs.get("username", "")
 if "saas_results"  not in st.session_state: st.session_state.saas_results  = None
 if "saas_running"  not in st.session_state: st.session_state.saas_running  = False
 
 # Inject active theme
-_css_map = {"dark": DARK_CSS, "light": LIGHT_CSS, "rainbow": RAINBOW_CSS}
+_css_map = {"rock": ROCK_CSS, "light": LIGHT_CSS, "desert": DESERT_CSS, "rainbow": RAINBOW_CSS}
 st.markdown(f"<style>{_css_map[st.session_state.theme]}</style>", unsafe_allow_html=True)
 
-# Background image (Cominc3.png) with per-theme overlay
-if _bg_b64:
-    _bg_opacity = {"dark": "0.13", "light": "0.10", "rainbow": "0.11"}[st.session_state.theme]
+# Per-theme background image injection  (b64, mime, opacity)
+_theme_bg = {
+    "rock":    (_rock_bg_b64,   "image/png",  "0.45"),
+    "light":   (_light_bg_b64,  "image/jpeg", "0.35"),
+    "desert":  (_desert_bg_b64, "image/png",  "0.40"),
+    "rainbow": (_desert_bg_b64, "image/png",  "0.15"),
+}
+_active_bg_b64, _active_bg_mime, _active_bg_opacity = _theme_bg.get(
+    st.session_state.theme, (_desert_bg_b64, "image/png", "0.13")
+)
+if _active_bg_b64:
     st.markdown(f"""
     <style>
     [data-testid="stAppViewContainer"]::before {{
         content: "";
         position: fixed;
         inset: 0;
-        background-image: url("data:image/png;base64,{_bg_b64}");
+        background-image: url("data:{_active_bg_mime};base64,{_active_bg_b64}");
         background-size: cover;
         background-position: center;
         background-attachment: fixed;
-        opacity: {_bg_opacity};
+        opacity: {_active_bg_opacity};
         pointer-events: none;
         z-index: 0;
     }}
@@ -165,14 +232,14 @@ if _bg_b64:
 
 # ── Welcome screen ─────────────────────────────────────────────────────────────
 if not st.session_state.username:
-    _bg_url = f'url("data:image/png;base64,{_bg_b64}")' if _bg_b64 else "none"
+    _wc_bg_url = f'url("data:image/png;base64,{_desert_bg_b64}")' if _desert_bg_b64 else "none"
     st.markdown(f"""
     <style>
     [data-testid="stSidebar"] {{ display: none !important; }}
 
     /* background fills full viewport at high opacity */
     html, body, [data-testid="stAppViewContainer"] {{
-        background-image: {_bg_url} !important;
+        background-image: {_wc_bg_url} !important;
         background-size: cover !important;
         background-position: center !important;
         background-repeat: no-repeat !important;
@@ -224,11 +291,20 @@ if not st.session_state.username:
     }}
     .wc-sub {{
         text-align: center;
-        font-size: 0.7rem;
-        letter-spacing: 5px;
+        font-size: 1.05rem;
+        letter-spacing: 4px;
         text-transform: uppercase;
-        color: #ccc;
-        margin-bottom: 28px;
+        color: #ddd;
+        margin-bottom: 24px;
+        font-weight: 500;
+    }}
+    /* bigger label for the name input */
+    [data-testid="stTextInput"] label p {{
+        font-size: 1.25rem !important;
+        font-weight: 600 !important;
+        color: #eee !important;
+        letter-spacing: 1px !important;
+        margin-bottom: 6px !important;
     }}
     </style>
     """, unsafe_allow_html=True)
@@ -243,6 +319,7 @@ if not st.session_state.username:
     if st.button("Enter →", use_container_width=True, type="primary"):
         if name_input.strip():
             st.session_state.username = name_input.strip()
+            _save_prefs(username=st.session_state.username)
             st.rerun()
     st.stop()
 
@@ -687,26 +764,34 @@ with st.sidebar:
         </div>
         """, unsafe_allow_html=True)
 
-    # Greeting
+    # Greeting — big name display
     st.markdown(
-        f"<div style='text-align:center;font-size:0.85rem;color:#888;"
-        f"padding:6px 0 10px;'>👋 Hi, <b>{st.session_state.username}</b>!</div>",
+        f"<div style='text-align:center;padding:8px 0 4px;'>"
+        f"<div style='font-size:0.75rem;color:#888;letter-spacing:2px;text-transform:uppercase;margin-bottom:2px;'>Welcome back</div>"
+        f"<div style='font-size:1.35rem;font-weight:700;color:#36cfc9;'>{st.session_state.username}</div>"
+        f"</div>",
         unsafe_allow_html=True,
     )
+    if st.button("✏️ Change Name", use_container_width=True, key="change_name_btn"):
+        st.session_state.username = ""
+        _save_prefs(username="")
+        st.rerun()
 
     # Theme switcher
     theme_choice = sac.segmented(
         items=[
-            sac.SegmentedItem(label="🌙 Dark"),
+            sac.SegmentedItem(label="🪨 Rock"),
             sac.SegmentedItem(label="☀️ Light"),
+            sac.SegmentedItem(label="🏜️ Desert"),
             sac.SegmentedItem(label="🌈 Rainbow"),
         ],
         label=None, size="xs", color="#36cfc9", use_container_width=True,
-        index={"dark": 0, "light": 1, "rainbow": 2}[st.session_state.theme],
+        index={"rock": 0, "light": 1, "desert": 2, "rainbow": 3}[st.session_state.theme],
     )
-    _label_map = {"🌙 Dark": "dark", "☀️ Light": "light", "🌈 Rainbow": "rainbow"}
+    _label_map = {"🪨 Rock": "rock", "☀️ Light": "light", "🏜️ Desert": "desert", "🌈 Rainbow": "rainbow"}
     if theme_choice and _label_map.get(theme_choice, st.session_state.theme) != st.session_state.theme:
         st.session_state.theme = _label_map[theme_choice]
+        _save_prefs(theme=st.session_state.theme)
         st.rerun()
 
     # Navigation menu
@@ -779,14 +864,16 @@ with st.sidebar:
 # Hero banner — theme-aware background
 if _logo_b64:
     _banner_bg = {
-        "dark":    "linear-gradient(160deg, #050a10 0%, #0c1826 50%, #050a10 100%)",
+        "rock":    "linear-gradient(160deg, #050a10 0%, #0c1826 50%, #050a10 100%)",
         "light":   "linear-gradient(160deg, #e8f0fe 0%, #dbeafe 50%, #e8f0fe 100%)",
+        "desert":  "linear-gradient(160deg, #2c1a08 0%, #4a2c10 50%, #2c1a08 100%)",
         "rainbow": "linear-gradient(160deg, #0a0010 0%, #100818 40%, #0a100a 100%)",
     }[st.session_state.theme]
-    _banner_blend = "multiply" if st.session_state.theme == "light" else "screen"
+    _banner_blend = "multiply" if st.session_state.theme in ("light", "desert") else "screen"
     _banner_glow  = {
-        "dark":    "drop-shadow(0 0 40px #36cfc966)",
+        "rock":    "drop-shadow(0 0 40px #36cfc966)",
         "light":   "drop-shadow(0 0 24px #0066cc55)",
+        "desert":  "drop-shadow(0 0 40px #c47c2b88)",
         "rainbow": "drop-shadow(0 0 40px #ff33ff66)",
     }[st.session_state.theme]
 
