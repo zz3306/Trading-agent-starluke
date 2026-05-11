@@ -71,6 +71,10 @@ def find_claude_exe() -> str:
     # Strategy 3 — probe known Windows locations
     home = os.path.expanduser("~")
     candidates = [
+        # ~/.local/bin (Scoop / manual installs)
+        os.path.join(home, ".local", "bin", "claude.exe"),
+        os.path.join(home, ".local", "bin", "claude.cmd"),
+        # npm global
         os.path.join(home, "AppData", "Roaming", "npm", "claude.cmd"),
         os.path.join(home, "AppData", "Local", "Programs", "claude", "claude.exe"),
         os.path.expandvars(r"%APPDATA%\npm\claude.cmd"),
@@ -80,9 +84,10 @@ def find_claude_exe() -> str:
         if os.path.isfile(c):
             return c
 
-    # Strategy 4 — augment PATH with npm global bin and retry
+    # Strategy 4 — augment PATH with npm global bin + ~/.local/bin and retry
     npm_bin = os.path.join(home, "AppData", "Roaming", "npm")
-    augmented = npm_bin + os.pathsep + os.environ.get("PATH", "")
+    local_bin = os.path.join(home, ".local", "bin")
+    augmented = local_bin + os.pathsep + npm_bin + os.pathsep + os.environ.get("PATH", "")
     exe = shutil.which("claude", path=augmented) or shutil.which("claude.cmd", path=augmented)
     if exe:
         return exe
@@ -133,7 +138,7 @@ class ClaudeCLIChatModel(BaseChatModel):
     """Thin LangChain ChatModel wrapper around the `claude` CLI subprocess."""
 
     model_name: str = Field(default="claude-cli")
-    timeout: int = Field(default=600)
+    timeout: int = Field(default=1800)
     # When True, pass --dangerously-skip-permissions so the CLI never blocks
     # on tool-approval prompts in non-interactive (subprocess) mode.
     skip_permissions: bool = Field(default=True)
@@ -399,7 +404,7 @@ class ClaudeCLIClient(BaseLLMClient):
     def get_llm(self) -> ClaudeCLIChatModel:
         return ClaudeCLIChatModel(
             model_name=self.model or "claude-cli",
-            timeout=self.kwargs.get("claude_cli_timeout", 600),
+            timeout=self.kwargs.get("claude_cli_timeout", 1800),
             skip_permissions=self.kwargs.get("claude_cli_skip_permissions", True),
         )
 
