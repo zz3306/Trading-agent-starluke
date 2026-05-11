@@ -710,6 +710,10 @@ def save_report_to_disk(final_state, ticker: str, save_path: Path):
         analysts_dir.mkdir(exist_ok=True)
         (analysts_dir / "fundamentals.md").write_text(final_state["fundamentals_report"], encoding="utf-8")
         analyst_parts.append(("Fundamentals Analyst", final_state["fundamentals_report"]))
+    if final_state.get("valuation_report"):
+        analysts_dir.mkdir(exist_ok=True)
+        (analysts_dir / "valuation.md").write_text(final_state["valuation_report"], encoding="utf-8")
+        analyst_parts.append(("Valuation Analyst", final_state["valuation_report"]))
     if analyst_parts:
         content = "\n\n".join(f"### {name}\n{text}" for name, text in analyst_parts)
         sections.append(f"## I. Analyst Team Reports\n\n{content}")
@@ -791,6 +795,8 @@ def display_complete_report(final_state):
         analysts.append(("News Analyst", final_state["news_report"]))
     if final_state.get("fundamentals_report"):
         analysts.append(("Fundamentals Analyst", final_state["fundamentals_report"]))
+    if final_state.get("valuation_report"):
+        analysts.append(("Valuation Analyst", final_state["valuation_report"]))
     if analysts:
         console.print(Panel("[bold]I. Analyst Team Reports[/bold]", border_style="cyan"))
         for title, content in analysts:
