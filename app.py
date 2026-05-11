@@ -1378,25 +1378,23 @@ else:
             )
             st.progress(min(_n_done / max(_total, 1), 0.99))
 
-            # Build step list: completed ✅ + current ⚙️ (from pipeline, even before callback fires)
+            # Build step list: completed ✅ + current ⚙️
             _rows = "".join(
                 f"<div style='padding:3px 0;font-size:0.88rem;'>✅ {s}</div>"
                 for s in _prog
             )
-            if _current_node:
-                _rows += (
-                    f"<div style='padding:4px 0;font-size:0.92rem;font-weight:600;"
-                    f"color:#36cfc9;'>⚙️ {_current_node}"
-                    f" &nbsp;<span style='opacity:0.6;font-size:0.8rem;'>running…</span></div>"
-                )
-            if _rows:
-                st.markdown(
-                    f"<div style='border:1px solid var(--sl-border);border-radius:10px;"
-                    f"padding:12px 18px;margin-top:8px;'>{_rows}</div>",
-                    unsafe_allow_html=True,
-                )
-            else:
-                st.markdown(f"<div style='color:var(--sl-muted);font-size:0.88rem;'>{t('initializing')}</div>", unsafe_allow_html=True)
+            # Current node from pipeline; if pipeline not loaded yet, show generic message
+            _current_label = _current_node or "Agents initializing…"
+            _rows += (
+                f"<div style='padding:4px 0;font-size:0.92rem;font-weight:600;"
+                f"color:#36cfc9;'>⚙️ {_current_label}"
+                f" &nbsp;<span style='opacity:0.6;font-size:0.8rem;'>running…</span></div>"
+            )
+            st.markdown(
+                f"<div style='border:1px solid var(--sl-border);border-radius:10px;"
+                f"padding:12px 18px;margin-top:8px;'>{_rows}</div>",
+                unsafe_allow_html=True,
+            )
 
         time.sleep(3)
         st.rerun()
