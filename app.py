@@ -613,7 +613,7 @@ if "theme"        not in st.session_state: st.session_state.theme        = _pref
 if "ui_lang"      not in st.session_state: st.session_state.ui_lang      = _prefs.get("ui_lang", "en")
 if "result"       not in st.session_state: st.session_state.result       = None
 if "running"      not in st.session_state: st.session_state.running      = False
-if "nav"          not in st.session_state: st.session_state.nav          = "New Analysis"
+if "nav"          not in st.session_state: st.session_state.nav          = "Browse Reports"
 if "username"     not in st.session_state: st.session_state.username     = _prefs.get("username", "")
 if "saas_results" not in st.session_state: st.session_state.saas_results = None
 if "saas_running" not in st.session_state: st.session_state.saas_running = False
@@ -1142,9 +1142,9 @@ with st.sidebar:
         st.rerun()
 
     # Navigation menu
-    _NAV_EN    = ["New Analysis", "SaaS Finder", "Browse Reports", "Signal Log"]
-    _NAV_ICONS = ["rocket-takeoff", "search", "folder2-open", "bar-chart-line"]
-    _nav_labels = [t("nav_new"), t("nav_saas"), t("nav_browse"), t("nav_log")]
+    _NAV_EN    = ["Browse Reports", "SaaS Finder", "Signal Log"]
+    _NAV_ICONS = ["folder2-open", "search", "bar-chart-line"]
+    _nav_labels = [t("nav_browse"), t("nav_saas"), t("nav_log")]
     nav = sac.menu([
         sac.MenuItem(lbl, icon=icon)
         for lbl, icon in zip(_nav_labels, _NAV_ICONS)
@@ -1154,91 +1154,6 @@ with st.sidebar:
             st.session_state.nav = _NAV_EN[_nav_labels.index(nav)]
         except ValueError:
             pass
-
-    sac.divider(label=t("div_config"), align="center", color="#333")
-
-    ticker = st.text_input(
-        t("ticker_label"), value="AAPL", placeholder=t("ticker_placeholder")
-    ).upper().strip()
-
-    # Default to last weekday (skip Saturday → Friday, Sunday → Friday)
-    _yesterday = date.today() - timedelta(days=1)
-    _default_date = _yesterday - timedelta(days=max(0, _yesterday.weekday() - 4))
-    trade_date = st.date_input(
-        t("date_label"),
-        value=_default_date,
-        max_value=date.today(),
-    )
-    if trade_date.weekday() >= 5:
-        st.warning("⚠️ Weekend — markets closed. No price data available. Select a weekday." if st.session_state.ui_lang == "en"
-                   else "⚠️ 周末市场休市，无行情数据，请选择工作日。")
-
-    sac.divider(label=t("div_analysts"), align="center", color="#333")
-
-    use_market       = st.checkbox(t("cb_market"),       value=True)
-    use_news         = st.checkbox(t("cb_news"),         value=True)
-    use_fundamentals = st.checkbox(t("cb_fundamentals"), value=True)
-    use_valuation    = st.checkbox(t("cb_valuation"),    value=True,  help=t("cb_valuation_help"))
-    use_macro        = st.checkbox(t("cb_macro"),        value=True,  help=t("cb_macro_help"))
-    use_social       = st.checkbox(t("cb_social"),       value=False, help=t("cb_social_help"))
-    use_options      = st.checkbox(t("cb_options"),      value=False, help=t("cb_options_help"))
-
-    selected_analysts = (
-        (["market"]       if use_market       else []) +
-        (["news"]         if use_news         else []) +
-        (["fundamentals"] if use_fundamentals else []) +
-        (["valuation"]    if use_valuation    else []) +
-        (["macro"]        if use_macro        else []) +
-        (["social"]       if use_social       else []) +
-        (["options"]      if use_options      else [])
-    )
-
-    sac.divider(label=t("div_depth"), align="center", color="#333")
-    _depth_labels = [t("depth_0"), t("depth_1"), t("depth_2")]
-    depth_choice = sac.segmented(
-        items=[sac.SegmentedItem(label=l) for l in _depth_labels],
-        label=None, size="xs", color="#36cfc9", use_container_width=True,
-        index=1,
-    )
-    depth_idx = _depth_labels.index(depth_choice) if depth_choice in _depth_labels else 1
-    selected_depth_cfg = _DEPTH_CFG[depth_idx]
-    st.caption(t(f"depth_hint_{depth_idx}"))
-
-    sac.divider(label=t("div_model"), align="center", color="#333")
-
-    from tradingagents.llm_clients.model_catalog import get_model_options
-    _qopts = get_model_options("claude_cli", "quick")
-    _dopts = get_model_options("claude_cli", "deep")
-    quick_model = dict(_qopts)[st.selectbox(t("model_quick"), [l for l,_ in _qopts], index=0)]
-    deep_model  = dict(_dopts)[st.selectbox(t("model_deep"),  [l for l,_ in _dopts], index=0)]
-
-    sac.divider(label=t("div_lang"), align="center", color="#333")
-    lang_choice = sac.segmented(
-        items=[sac.SegmentedItem(label="🇺🇸 English"), sac.SegmentedItem(label="🇨🇳 中文")],
-        label=None, size="xs", color="#36cfc9", use_container_width=True,
-        index=0,
-    )
-    output_language = "Chinese" if lang_choice == "🇨🇳 中文" else "English"
-
-    st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
-
-    run_btn = st.button(
-        t("run_btn"), use_container_width=True, type="primary",
-        disabled=not ticker or not selected_analysts or st.session_state.running,
-    )
-    if not selected_analysts:
-        st.warning(t("no_analyst_warn"))
-
-    if st.session_state.running:
-        if st.button("⏹ Stop / 强制停止", use_container_width=True):
-            with _RUN_LOCK:
-                _RUN["done"] = True
-                _RUN["result"] = {"error": "Cancelled by user.", "state": None}
-            st.session_state.running = False
-            st.rerun()
-
-    st.markdown("<div style='height:4px'></div>", unsafe_allow_html=True)
-    st.caption(t("run_hint"))
 
 
 # ── MAIN AREA ──────────────────────────────────────────────────────────────────
@@ -1281,73 +1196,21 @@ if _logo_b64:
     </div>
     """, unsafe_allow_html=True)
 
-# ── Kick off analysis ──────────────────────────────────────────────────────────
-if run_btn and not st.session_state.running:
-    _n_analysts = len(selected_analysts)
-    _dr = selected_depth_cfg.get("max_debate_rounds", 1)
-    _rr = selected_depth_cfg.get("max_risk_discuss_rounds", 1)
-    _total = _n_analysts + 2 * _dr + 1 + 1 + 3 * _rr + 1
-
-    # Build the expected node order so the UI can show "currently running X"
-    # even before any callbacks fire (each analyst takes 10-20 min on first run).
-    _analyst_label_map = {
-        "market": "📈 Market Analyst", "news": "📰 News Analyst",
-        "fundamentals": "🏢 Fundamentals Analyst", "valuation": "🔢 Valuation Analyst",
-        "macro": "🌐 Macro Analyst", "social": "💬 Social Analyst",
-        "options": "💵 Options Analyst",
-    }
-    _pipeline = (
-        [_analyst_label_map.get(a, a.capitalize()) for a in selected_analysts]
-        + ["🟢 Bull Researcher", "🔴 Bear Researcher"] * _dr
-        + ["👔 Research Manager", "🤝 Trader"]
-        + ["🔴 Risk · Aggressive", "🟢 Risk · Conservative", "🟡 Risk · Neutral"] * _rr
-        + ["🏆 Portfolio Manager"]
-    )
-
-    with _RUN_LOCK:
-        _RUN.update({"active": True, "progress": [], "result": None, "done": False, "error": None})
-    st.session_state.result        = None
-    st.session_state.running       = True
-    st.session_state.nav           = "New Analysis"
-    st.session_state._run_ticker   = ticker
-    st.session_state._run_date     = str(trade_date)
-    st.session_state._run_total    = _total
-    st.session_state._run_started  = time.time()
-    st.session_state._run_pipeline = _pipeline   # store in session_state, not _RUN
-    threading.Thread(
-        target=run_analysis,
-        args=(ticker, trade_date, selected_analysts, quick_model, deep_model,
-              output_language, selected_depth_cfg),
-        daemon=True,
-    ).start()
-    st.rerun()
-
-# ── Poll for completion ────────────────────────────────────────────────────────
-if st.session_state.running:
-    with _RUN_LOCK:
-        _done   = _RUN["done"]
-        _result = _RUN.get("result")
-    if _done:
-        st.session_state.running = False
-        st.session_state.result  = _result
-        st.rerun()
-
 # ── Page routing ───────────────────────────────────────────────────────────────
 page = st.session_state.nav
 
-if page == "Browse Reports":
-    st.markdown(t("browse_title"))
-    _render_browse_reports()
+if page == "SaaS Finder":
+    _render_saas_finder_page()
 
 elif page == "Signal Log":
     st.markdown(t("log_title"))
     _render_signal_log()
 
-elif page == "SaaS Finder":
-    _render_saas_finder_page()
+else:  # Browse Reports (default)
+    st.markdown(t("browse_title"))
+    _render_browse_reports()
 
-else:
-    # ── New Analysis page ──────────────────────────────────────────────────────
+if False:  # dead code kept for reference — New Analysis removed
     result = st.session_state.result
 
     if st.session_state.running:
