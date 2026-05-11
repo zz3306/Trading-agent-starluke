@@ -247,25 +247,88 @@ def _render_browse_reports():
         st.info("No reports saved yet. Run an analysis first.")
         return
     tickers = sorted([p.name for p in reports_dir.iterdir()
-                      if p.is_dir() and p.name != "signal_log.csv"])
+                      if p.is_dir() and p.name not in ("signal_log.csv", "saas_finder")])
     if not tickers:
         st.info("No reports saved yet.")
         return
-    selected_ticker = st.selectbox("Ticker", tickers)
+
+    c1, c2 = st.columns([1, 1])
+    with c1:
+        selected_ticker = st.selectbox("Ticker", tickers)
     ticker_dir = reports_dir / selected_ticker
     dates = sorted([p.name for p in ticker_dir.iterdir() if p.is_dir()], reverse=True)
     if not dates:
         st.info(f"No reports for {selected_ticker}.")
         return
-    selected_date = st.selectbox("Date", dates)
-    report_path = ticker_dir / selected_date / "complete_report.md"
-    if report_path.exists():
-        st.markdown(f"**{selected_ticker} — {selected_date}**")
-        st.markdown(report_path.read_text(encoding="utf-8"))
-    else:
-        for md_file in sorted((ticker_dir / selected_date).rglob("*.md")):
-            with st.expander(md_file.relative_to(ticker_dir / selected_date).as_posix()):
-                st.markdown(md_file.read_text(encoding="utf-8"))
+    with c2:
+        selected_date = st.selectbox("Date", dates)
+
+    base = ticker_dir / selected_date
+
+    # ── Five-section tabs ──────────────────────────────────────────────────────
+    _SECTIONS = [
+        ("I · Analysts",   "1_analysts",  "bar-chart",       [
+            ("market",       "📈 Market"),
+            ("news",         "📰 News"),
+            ("fundamentals", "🏢 Fundamentals"),
+            ("valuation",    "🔢 Valuation"),
+            ("macro",        "🌐 Macro"),
+            ("sentiment",    "💬 Sentiment"),
+            ("options",      "💵 Options"),
+        ]),
+        ("II · Research",  "2_research",  "people",          [
+            ("bull",    "🟢 Bull Researcher"),
+            ("bear",    "🔴 Bear Researcher"),
+            ("manager", "👔 Research Manager"),
+        ]),
+        ("III · Trading",  "3_trading",   "graph-up-arrow",  [
+            ("trader",  "🤝 Trader"),
+        ]),
+        ("IV · Risk",      "4_risk",      "shield-exclamation", [
+            ("aggressive",   "🔴 Aggressive"),
+            ("conservative", "🟢 Conservative"),
+            ("neutral",      "🟡 Neutral"),
+        ]),
+        ("V · Portfolio",  "5_portfolio", "clipboard-check", [
+            ("decision", "🏆 Final Decision"),
+        ]),
+    ]
+
+    section_tab = sac.tabs(
+        [sac.TabsItem(label, icon=icon) for label, _, icon, _ in _SECTIONS],
+        color="#36cfc9", size="sm", align="start",
+    )
+
+    for label, folder, _, files in _SECTIONS:
+        if section_tab != label:
+            continue
+        section_dir = base / folder
+        if not section_dir.exists():
+            st.info(f"No {label} data found for {selected_ticker} / {selected_date}.")
+            break
+
+        # If only one file, show it directly; otherwise show sub-tabs
+        available = [(stem, title) for stem, title in files
+                     if (section_dir / f"{stem}.md").exists()]
+
+        if not available:
+            st.info("No files saved for this section.")
+            break
+
+        if len(available) == 1:
+            stem, title = available[0]
+            st.markdown(f"#### {title}")
+            st.markdown((section_dir / f"{stem}.md").read_text(encoding="utf-8"))
+        else:
+            sub_tab = sac.tabs(
+                [sac.TabsItem(title) for _, title in available],
+                color="#36cfc9", size="xs", align="start",
+            )
+            for stem, title in available:
+                if sub_tab == title:
+                    st.markdown((section_dir / f"{stem}.md").read_text(encoding="utf-8"))
+                    break
+        break
 
 def _render_signal_log():
     import pandas as pd
