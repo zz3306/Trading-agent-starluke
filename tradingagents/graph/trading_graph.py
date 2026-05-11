@@ -49,36 +49,6 @@ from .propagation import Propagator
 from .reflection import Reflector
 from .signal_processing import SignalProcessor
 
-# ── Internal node-progress callback ───────────────────────────────────────────
-# Nodes whose names begin with these prefixes are internal graph plumbing.
-# We skip them so the progress bar only shows meaningful analyst/researcher names.
-_SKIP_PREFIXES = ("tools_", "Msg Clear", "__")
-
-try:
-    from langchain_core.callbacks.base import BaseCallbackHandler as _BaseCallbackHandler
-
-    class _NodeProgressCallback(_BaseCallbackHandler):
-        """Fires progress_cb(node_name) whenever a top-level LangGraph node finishes."""
-
-        def __init__(self, progress_cb):
-            super().__init__()
-            self._cb = progress_cb
-
-        def on_chain_end(self, outputs, *, run_id=None, parent_run_id=None,
-                         tags=None, run_name=None, **kwargs):
-            name = run_name or ""
-            if not name:
-                return
-            if any(name.startswith(p) for p in _SKIP_PREFIXES):
-                return
-            try:
-                self._cb(name)
-            except Exception:
-                pass
-
-except ImportError:
-    _NodeProgressCallback = None  # type: ignore
-
 
 class TradingAgentsGraph:
     """Main class that orchestrates the trading agents framework."""
@@ -376,18 +346,31 @@ class TradingAgentsGraph:
             tid = thread_id(company_name, str(trade_date))
             args.setdefault("config", {}).setdefault("configurable", {})["thread_id"] = tid
 
-        # Inject progress callback into LangGraph config when provided.
-        # Uses LangChain's BaseCallbackHandler so it works alongside graph.invoke()
-        # without touching stream_mode (avoids "got multiple values" errors).
-        if progress_cb and _NodeProgressCallback is not None:
-            run_args = dict(args)
-            cfg = dict(run_args.pop("config", {}))
-            cfg.setdefault("callbacks", []).append(_NodeProgressCallback(progress_cb))
-            run_args["config"] = cfg
-        else:
-            run_args = args
+        # Build invocation args.  stream_mode comes from get_graph_args() as
+        # "values" (full state per step).  When we need per-node progress we
+        # switch to "updates" (delta per node) — strip the key then override.
+        _SKIP_NODES = ("tools_", "Msg Clear", "__")
 
-        if self.debug:
+        if progress_cb:
+            # stream_mode="updates" → each chunk is {node_name: state_delta}
+            run_args = {k: v for k, v in args.items() if k != "stream_mode"}
+            run_args["stream_mode"] = "updates"
+
+            final_state = dict(init_agent_state)
+            for chunk in self.graph.stream(init_agent_state, **run_args):
+                for node_name, delta in chunk.items():
+                    if not any(node_name.startswith(p) for p in _SKIP_NODES):
+                        try:
+                            progress_cb(node_name)
+                        except Exception:
+                            pass
+                    # Merge non-message fields into accumulated final state
+                    if isinstance(delta, dict):
+                        for k, v in delta.items():
+                            if k != "messages" and v is not None:
+                                final_state[k] = v
+        elif self.debug:
+            run_args = args
             trace = []
             for chunk in self.graph.stream(init_agent_state, **run_args):
                 if chunk.get("messages"):
@@ -395,7 +378,7 @@ class TradingAgentsGraph:
                 trace.append(chunk)
             final_state = trace[-1] if trace else self.graph.invoke(init_agent_state, **run_args)
         else:
-            final_state = self.graph.invoke(init_agent_state, **run_args)
+            final_state = self.graph.invoke(init_agent_state, **args)
 
         # Store current state for reflection.
         self.curr_state = final_state

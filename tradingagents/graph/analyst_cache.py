@@ -6,7 +6,7 @@ import logging
 from pathlib import Path
 from typing import Callable
 
-from langchain_core.messages import HumanMessage
+from langchain_core.messages import AIMessage, HumanMessage
 
 logger = logging.getLogger(__name__)
 
@@ -50,8 +50,10 @@ def with_analyst_cache(analyst_type: str, node_fn: Callable) -> Callable:
                 cached = path.read_text(encoding="utf-8").strip()
                 if cached:
                     logger.info("Cache hit: %s for %s on %s", analyst_type, ticker, trade_date)
+                    # Return AIMessage (not HumanMessage) so conditional edges
+                    # can safely check .tool_calls without AttributeError.
                     return {
-                        "messages": [HumanMessage(content=f"[{analyst_type} report loaded from cache]")],
+                        "messages": [AIMessage(content=f"[{analyst_type} report loaded from cache]")],
                         report_key: cached,
                     }
             except Exception as exc:
