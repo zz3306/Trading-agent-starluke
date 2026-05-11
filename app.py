@@ -45,7 +45,7 @@ html, body, [data-testid="stAppViewContainer"], [data-testid="stMain"] {
     border-bottom: 1px solid #222;
     margin-bottom: 4px;
 }
-.logo-wrap img { width: 100%; max-width: 200px; display: block; margin: 0 auto; }
+.logo-wrap img { width: 100%; max-width: 260px; display: block; margin: 0 auto; }
 .logo-sub {
     text-align: center; font-size: 10px; color: #444;
     letter-spacing: 3px; text-transform: uppercase; margin-top: 6px;
@@ -70,7 +70,7 @@ html, body, [data-testid="stAppViewContainer"], [data-testid="stMain"] {
     display: flex; align-items: center; gap: 14px;
     padding: 18px 0 14px; border-bottom: 1px solid #222; margin-bottom: 20px;
 }
-.main-header img { height: 44px; }
+.main-header img { height: 60px; }
 .main-header-sub { font-size: 10px; color: #444; letter-spacing: 3px; text-transform: uppercase; }
 
 /* Markdown content */
