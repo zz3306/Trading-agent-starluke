@@ -1445,7 +1445,21 @@ Macro   ┘  Res. Mgr
         elif tab == t("tab_trader"):
             show("trader_investment_plan")
         elif tab == t("tab_research"):
-            show("investment_plan")
+            ids = state.get("investment_debate_state", {})
+            bull_txt = ids.get("bull_history", "") or ids.get("current_response", "")
+            bear_txt = ids.get("bear_history", "")
+            mgr_txt  = state.get("investment_plan", "")
+
+            c1, c2 = st.columns(2)
+            with c1:
+                sac.divider(label="🟢 Bull Case", color="#00e676")
+                st.markdown((bull_txt[:4000] + ("…" if len(bull_txt) > 4000 else "")) if bull_txt else "_Not available_")
+            with c2:
+                sac.divider(label="🔴 Bear Case", color="#ff1744")
+                st.markdown((bear_txt[:4000] + ("…" if len(bear_txt) > 4000 else "")) if bear_txt else "_Not available_")
+
+            sac.divider(label="👔 Research Manager Decision", color="#36cfc9")
+            st.markdown(mgr_txt if mgr_txt else "_Not available_")
         elif tab == t("tab_market"):
             show("market_report", t("no_market"))
         elif tab == t("tab_news"):
