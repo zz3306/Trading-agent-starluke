@@ -125,14 +125,57 @@ hr { border-color:#1f1f1f !important; }
 """
 
 # ── Session state ──────────────────────────────────────────────────────────────
-if "theme"  not in st.session_state: st.session_state.theme  = "dark"
-if "result" not in st.session_state: st.session_state.result = None
-if "running" not in st.session_state: st.session_state.running = False
-if "nav"    not in st.session_state: st.session_state.nav    = "New Analysis"
+if "theme"    not in st.session_state: st.session_state.theme    = "dark"
+if "result"   not in st.session_state: st.session_state.result   = None
+if "running"  not in st.session_state: st.session_state.running  = False
+if "nav"      not in st.session_state: st.session_state.nav      = "New Analysis"
+if "username" not in st.session_state: st.session_state.username = ""
 
 # Inject active theme
 _css_map = {"dark": DARK_CSS, "light": LIGHT_CSS, "rainbow": RAINBOW_CSS}
 st.markdown(f"<style>{_css_map[st.session_state.theme]}</style>", unsafe_allow_html=True)
+
+# ── Welcome screen ─────────────────────────────────────────────────────────────
+if not st.session_state.username:
+    st.markdown("""
+    <style>
+    [data-testid="stSidebar"] { display: none; }
+    .welcome-wrap {
+        display: flex; flex-direction: column; align-items: center;
+        justify-content: center; min-height: 80vh; gap: 24px;
+    }
+    .welcome-wrap img { width: 340px; margin-bottom: 8px; }
+    .welcome-title {
+        font-size: 1.1rem; color: #888;
+        letter-spacing: 4px; text-transform: uppercase;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+    _, col, _ = st.columns([1, 1.4, 1])
+    with col:
+        st.markdown('<div class="welcome-wrap">', unsafe_allow_html=True)
+        if _logo_b64:
+            st.markdown(
+                f'<img src="data:image/png;base64,{_logo_b64}" '
+                f'style="width:320px;display:block;margin:0 auto 8px;">',
+                unsafe_allow_html=True,
+            )
+        st.markdown(
+            '<div class="welcome-title">Multi-Agent Stock Analysis</div>',
+            unsafe_allow_html=True,
+        )
+        st.markdown("<div style='height:24px'></div>", unsafe_allow_html=True)
+        name_input = st.text_input(
+            "What's your name?", placeholder="Enter your name…",
+            label_visibility="visible",
+        )
+        if st.button("Enter →", use_container_width=True, type="primary"):
+            if name_input.strip():
+                st.session_state.username = name_input.strip()
+                st.rerun()
+        st.markdown('</div>', unsafe_allow_html=True)
+    st.stop()
 
 
 
@@ -241,6 +284,13 @@ with st.sidebar:
             <div class="logo-sub">Powered by Claude CLI</div>
         </div>
         """, unsafe_allow_html=True)
+
+    # Greeting
+    st.markdown(
+        f"<div style='text-align:center;font-size:0.85rem;color:#888;"
+        f"padding:6px 0 10px;'>👋 Hi, <b>{st.session_state.username}</b>!</div>",
+        unsafe_allow_html=True,
+    )
 
     # Theme switcher
     theme_choice = sac.segmented(
