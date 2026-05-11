@@ -330,6 +330,8 @@ def _render_browse_reports():
 
     # ══════════════════════════════════════════════════════════════════════════
     if mode == "📊 Compare Dates":
+        import json as _json, subprocess as _sp
+
         c1, c2 = st.columns([1, 2])
         with c1:
             cmp_ticker = st.selectbox("Ticker", tickers, key="cmp_tick")
@@ -340,47 +342,119 @@ def _render_browse_reports():
             return
         with c2:
             cmp_dates = st.multiselect("Select dates to compare", dates,
-                                       default=dates[:min(3, len(dates))])
+                                       default=dates[:min(4, len(dates))])
         if not cmp_dates:
             return
 
-        # Signal summary row
-        st.markdown("#### Signal History")
-        sig_cols = st.columns(len(cmp_dates))
-        for i, d in enumerate(sorted(cmp_dates)):
-            sig = _read_signal_from_folder(ticker_dir / d)
-            sig_cols[i].metric(d, sig)
+        sorted_dates = sorted(cmp_dates)
+
+        # Load summaries (never full reports)
+        summaries = {}
+        for d in sorted_dates:
+            sj = ticker_dir / d / "summary.json"
+            if sj.exists():
+                summaries[d] = _json.loads(sj.read_text(encoding="utf-8"))
+            else:
+                # fallback: derive signal from decision.md only
+                summaries[d] = {"date": d, "signal": _read_signal_from_folder(ticker_dir / d),
+                                 "_no_summary": True}
+
+        # ── Signal timeline ────────────────────────────────────────────────────
+        st.markdown("#### Signal Timeline")
+        sig_cols = st.columns(len(sorted_dates))
+        _sig_icon = {"BUY": "🟢", "SELL": "🔴", "HOLD": "🟡"}
+        for i, d in enumerate(sorted_dates):
+            sig = summaries[d].get("signal", "—")
+            sig_cols[i].metric(d, f"{_sig_icon.get(sig, '')} {sig}")
 
         st.divider()
 
-        # Section picker for side-by-side content
-        sec_label = st.selectbox(
-            "Section to compare",
-            [lbl for lbl, _, _, _ in _SECTIONS],
+        # ── Structured diff table (from summaries only) ────────────────────────
+        st.markdown("#### Key Points by Date")
+        _COMPARE_FIELDS = [
+            ("bull_thesis",       "🟢 Bull Thesis"),
+            ("bear_thesis",       "🔴 Bear Thesis"),
+            ("trader_plan",       "🤝 Trader Plan"),
+            ("final_decision",    "🏆 PM Decision"),
+            ("analysts.market",   "📈 Market"),
+            ("analysts.news",     "📰 News"),
+            ("analysts.fundamentals", "🏢 Fundamentals"),
+        ]
+        field_choice = st.selectbox(
+            "Field to compare",
+            [label for _, label in _COMPARE_FIELDS],
+            key="cmp_field",
         )
-        sec_folder, sec_files = next(
-            (f, fs) for lbl, f, _, fs in _SECTIONS if lbl == sec_label
-        )
+        chosen_key = next(k for k, l in _COMPARE_FIELDS if l == field_choice)
 
-        available_stems = [(stem, title) for stem, title in sec_files]
-        if len(available_stems) > 1:
-            file_choice = st.radio(
-                "File", [t for _, t in available_stems], horizontal=True
-            )
-            chosen_stem = next(s for s, t in available_stems if t == file_choice)
-        else:
-            chosen_stem = available_stems[0][0]
+        def _get_field(s: dict, key: str) -> str:
+            if "." in key:
+                a, b = key.split(".", 1)
+                return s.get(a, {}).get(b, "_not available_")
+            return s.get(key, "_not available_")
 
-        sorted_dates = sorted(cmp_dates)
         cols = st.columns(len(sorted_dates))
         for i, d in enumerate(sorted_dates):
             with cols[i]:
                 st.markdown(f"**{d}**")
-                fpath = ticker_dir / d / sec_folder / f"{chosen_stem}.md"
-                if fpath.exists():
-                    st.markdown(fpath.read_text(encoding="utf-8"))
+                if summaries[d].get("_no_summary"):
+                    st.caption("No summary.json — re-run analysis to generate")
                 else:
-                    st.caption("_Not available_")
+                    val = _get_field(summaries[d], chosen_key)
+                    st.markdown(val or "_empty_")
+
+        st.divider()
+
+        # ── AI comparison (summaries only → tiny prompt) ───────────────────────
+        st.markdown("#### 🤖 AI Comparison")
+        st.caption("Sends only the extracted summaries (~2 KB) — not the full reports.")
+
+        if st.button("Compare with Claude", type="primary"):
+            # Build compact prompt from summaries
+            blocks = []
+            for d in sorted_dates:
+                s = summaries[d]
+                if s.get("_no_summary"):
+                    blocks.append(f"## {d}\nSignal: {s.get('signal','?')}\n(No summary available)")
+                    continue
+                blocks.append(
+                    f"## {d}  |  Signal: {s.get('signal','?')}\n"
+                    f"Bull: {s.get('bull_thesis','')}\n"
+                    f"Bear: {s.get('bear_thesis','')}\n"
+                    f"Trader: {s.get('trader_plan','')}\n"
+                    f"PM Decision: {s.get('final_decision','')}\n"
+                    f"Market: {s.get('analysts',{}).get('market','')}\n"
+                    f"Fundamentals: {s.get('analysts',{}).get('fundamentals','')}"
+                )
+
+            prompt = (
+                f"You are a financial analyst. Compare these {len(sorted_dates)} analyses "
+                f"of {cmp_ticker} across different dates.\n\n"
+                + "\n\n---\n\n".join(blocks)
+                + "\n\n---\n\n"
+                "Answer these questions concisely:\n"
+                "1. How did the signal change and why?\n"
+                "2. What changed most in the bull/bear thesis?\n"
+                "3. What changed in fundamentals or market technicals?\n"
+                "4. What is the trend — improving, deteriorating, or stable?\n"
+                "Keep your response under 400 words."
+            )
+
+            with st.spinner("Comparing with Claude…"):
+                try:
+                    proc = _sp.Popen(
+                        ["claude", "--output-format", "text",
+                         "--dangerously-skip-permissions", "-p", prompt],
+                        stdout=_sp.PIPE, stderr=_sp.PIPE,
+                        stdin=_sp.DEVNULL, encoding="utf-8", errors="replace",
+                    )
+                    out, err = proc.communicate(timeout=120)
+                    if proc.returncode == 0 and out.strip():
+                        st.markdown(out.strip())
+                    else:
+                        st.error(f"Claude error: {err.strip()[:300]}")
+                except Exception as e:
+                    st.error(f"Failed: {e}")
         return
 
     # ══════════════════════════════════════════════════════════════════════════
@@ -560,11 +634,13 @@ def run_analysis(ticker, trade_date, analysts, result_holder,
                         "quick_think_llm": quick_model, "deep_think_llm": deep_model})
         ta = TradingAgentsGraph(debug=False, config=config)
         final_state, signal = ta.propagate(ticker, str(trade_date))
-        from cli.main import save_report_to_disk
+        from cli.main import save_report_to_disk, extract_and_save_summary
         for base in [config.get("results_dir_local"), config.get("results_dir")]:
             if base:
-                try: save_report_to_disk(final_state, ticker,
-                                         Path(base) / ticker / str(trade_date))
+                try:
+                    p = Path(base) / ticker / str(trade_date)
+                    save_report_to_disk(final_state, ticker, p)
+                    extract_and_save_summary(final_state, ticker, p)
                 except Exception: pass
         result_holder.update({"state": final_state, "signal": signal, "error": None})
         try:

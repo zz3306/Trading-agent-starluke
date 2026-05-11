@@ -720,6 +720,66 @@ def _append_signal_log(config: dict, ticker: str, analysis_date: str, signal: st
         ])
 
 
+def _snippet(text: str, n: int = 300) -> str:
+    """Return first n chars of text, stripped of leading markdown noise."""
+    if not text:
+        return ""
+    # skip leading whitespace / heading lines
+    lines = [l for l in text.strip().splitlines() if l.strip()]
+    joined = " ".join(lines)
+    return joined[:n].rstrip() + ("…" if len(joined) > n else "")
+
+
+def extract_and_save_summary(final_state: dict, ticker: str, save_path: Path) -> None:
+    """Extract key data points and write summary.json (< 3 KB) alongside full reports.
+
+    This is the only file read during historical comparison — never the full markdowns.
+    """
+    import json as _json
+    from datetime import datetime as _dt
+
+    debate = final_state.get("investment_debate_state") or {}
+    risk   = final_state.get("risk_debate_state") or {}
+
+    # Derive signal
+    decision_text = risk.get("judge_decision", "")
+    upper = decision_text.upper()
+    if any(w in upper for w in ("STRONG BUY", "BUY")):
+        signal = "BUY"
+    elif any(w in upper for w in ("STRONG SELL", "SELL")):
+        signal = "SELL"
+    else:
+        signal = "HOLD"
+
+    summary = {
+        "ticker":       ticker,
+        "date":         str(final_state.get("trade_date", "")),
+        "signal":       signal,
+        "generated_at": _dt.now().strftime("%Y-%m-%d %H:%M"),
+        "analysts": {
+            "market":       _snippet(final_state.get("market_report", "")),
+            "news":         _snippet(final_state.get("news_report", "")),
+            "fundamentals": _snippet(final_state.get("fundamentals_report", "")),
+            "valuation":    _snippet(final_state.get("valuation_report", "")),
+            "macro":        _snippet(final_state.get("macro_report", "")),
+            "sentiment":    _snippet(final_state.get("sentiment_report", "")),
+            "options":      _snippet(final_state.get("options_report", "")),
+        },
+        "bull_thesis":       _snippet(debate.get("bull_history", ""), 400),
+        "bear_thesis":       _snippet(debate.get("bear_history", ""), 400),
+        "research_plan":     _snippet(debate.get("judge_decision", ""), 400),
+        "trader_plan":       _snippet(final_state.get("trader_investment_plan", ""), 400),
+        "risk_aggressive":   _snippet(risk.get("aggressive_history", ""), 200),
+        "risk_conservative": _snippet(risk.get("conservative_history", ""), 200),
+        "risk_neutral":      _snippet(risk.get("neutral_history", ""), 200),
+        "final_decision":    _snippet(decision_text, 600),
+    }
+
+    save_path.mkdir(parents=True, exist_ok=True)
+    with open(save_path / "summary.json", "w", encoding="utf-8") as f:
+        _json.dump(summary, f, indent=2, ensure_ascii=False)
+
+
 def save_report_to_disk(final_state, ticker: str, save_path: Path):
     """Save complete analysis report to disk with organized subfolders."""
     save_path.mkdir(parents=True, exist_ok=True)
@@ -819,6 +879,10 @@ def save_report_to_disk(final_state, ticker: str, save_path: Path):
     # Write consolidated report
     header = f"# Trading Analysis Report: {ticker}\n\nGenerated: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
     (save_path / "complete_report.md").write_text(header + "\n\n".join(sections), encoding="utf-8")
+
+    # Write lightweight summary for historical comparison
+    extract_and_save_summary(final_state, ticker, save_path)
+
     return save_path / "complete_report.md"
 
 
