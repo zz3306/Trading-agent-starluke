@@ -652,7 +652,7 @@ def _render_signal_log():
             if val == "BUY":  return "color:#00e676;font-weight:bold"
             if val == "SELL": return "color:#ff1744;font-weight:bold"
             return "color:#ffb800;font-weight:bold"
-        st.dataframe(df.style.applymap(color_signal, subset=["signal"]),
+        st.dataframe(df.style.map(color_signal, subset=["signal"]),
                      use_container_width=True)
         c1, c2, c3, c4 = st.columns(4)
         c1.metric("Total",  len(df))
@@ -734,7 +734,7 @@ def _render_saas_finder_page():
             return ""
 
         st.dataframe(
-            df.style.applymap(_color_total, subset=["Total /40"]),
+            df.style.map(_color_total, subset=["Total /40"]),
             use_container_width=True,
         )
 
