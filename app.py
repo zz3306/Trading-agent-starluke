@@ -165,58 +165,101 @@ if _bg_b64:
 
 # ── Welcome screen ─────────────────────────────────────────────────────────────
 if not st.session_state.username:
-    _bg_style = (
-        f'background-image:url("data:image/png;base64,{_bg_b64}");'
-        'background-size:cover;background-position:center;'
-        if _bg_b64 else ""
-    )
+    _bg_url = f'url("data:image/png;base64,{_bg_b64}")' if _bg_b64 else "none"
+    _logo_url = f'url("data:image/png;base64,{_logo_b64}")' if _logo_b64 else "none"
     st.markdown(f"""
     <style>
-    [data-testid="stSidebar"] {{ display: none; }}
+    /* hide sidebar and strip all default padding */
+    [data-testid="stSidebar"] {{ display: none !important; }}
+    [data-testid="stAppViewContainer"],
+    [data-testid="stMain"],
+    [data-testid="stMain"] > div,
+    [data-testid="stMain"] > div > div,
+    [data-testid="block-container"] {{
+        padding: 0 !important;
+        margin: 0 !important;
+        max-width: 100% !important;
+    }}
+    /* full-screen background */
     [data-testid="stAppViewContainer"] {{
-        {_bg_style}
+        background-image: {_bg_url};
+        background-size: cover;
+        background-position: center;
+        min-height: 100vh;
     }}
+    /* dark overlay */
     [data-testid="stAppViewContainer"]::after {{
-        content:""; position:fixed; inset:0;
-        background:rgba(0,0,0,0.62); pointer-events:none; z-index:0;
+        content: "";
+        position: fixed;
+        inset: 0;
+        background: rgba(0,0,0,0.65);
+        pointer-events: none;
+        z-index: 0;
     }}
-    .welcome-wrap {{
-        position:relative; z-index:1;
-        display: flex; flex-direction: column; align-items: center;
-        justify-content: center; min-height: 80vh; gap: 24px;
+    /* center the Streamlit block container */
+    [data-testid="stMain"] {{
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        min-height: 100vh !important;
+        position: relative;
+        z-index: 1;
     }}
-    .welcome-wrap img {{ width: 340px; margin-bottom: 8px; }}
-    .welcome-title {{
-        font-size: 1.1rem; color: #ccc;
-        letter-spacing: 4px; text-transform: uppercase;
+    [data-testid="block-container"] {{
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: center !important;
+        justify-content: center !important;
+        width: 100% !important;
+        min-height: 100vh !important;
     }}
-    [data-testid="stMain"] > div {{ position:relative; z-index:1; }}
+    /* card */
+    .wc-card {{
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0;
+        width: 100%;
+        max-width: 480px;
+        padding: 0 24px;
+    }}
+    .wc-logo {{
+        width: 480px;
+        max-width: 90vw;
+        margin-bottom: 6px;
+        filter: drop-shadow(0 0 32px #36cfc955);
+    }}
+    .wc-sub {{
+        font-size: 0.78rem;
+        letter-spacing: 5px;
+        text-transform: uppercase;
+        color: #aaa;
+        margin-bottom: 32px;
+        text-align: center;
+    }}
+    /* make input and button full width */
+    .wc-card [data-testid="stTextInput"],
+    .wc-card [data-testid="stTextInput"] input,
+    .wc-card [data-testid="stButton"] button {{
+        width: 100% !important;
+    }}
     </style>
     """, unsafe_allow_html=True)
 
-    _, col, _ = st.columns([1, 1.4, 1])
-    with col:
-        st.markdown('<div class="welcome-wrap">', unsafe_allow_html=True)
-        if _logo_b64:
-            st.markdown(
-                f'<img src="data:image/png;base64,{_logo_b64}" '
-                f'style="width:320px;display:block;margin:0 auto 8px;">',
-                unsafe_allow_html=True,
-            )
+    st.markdown('<div class="wc-card">', unsafe_allow_html=True)
+    if _logo_b64:
         st.markdown(
-            '<div class="welcome-title">Multi-Agent Stock Analysis</div>',
+            f'<img class="wc-logo" src="data:image/png;base64,{_logo_b64}" alt="STARLUKE">',
             unsafe_allow_html=True,
         )
-        st.markdown("<div style='height:24px'></div>", unsafe_allow_html=True)
-        name_input = st.text_input(
-            "What's your name?", placeholder="Enter your name…",
-            label_visibility="visible",
-        )
-        if st.button("Enter →", use_container_width=True, type="primary"):
-            if name_input.strip():
-                st.session_state.username = name_input.strip()
-                st.rerun()
-        st.markdown('</div>', unsafe_allow_html=True)
+    st.markdown('<div class="wc-sub">Multi-Agent Stock Analysis</div>', unsafe_allow_html=True)
+
+    name_input = st.text_input("What's your name?", placeholder="Enter your name…")
+    if st.button("Enter →", use_container_width=True, type="primary"):
+        if name_input.strip():
+            st.session_state.username = name_input.strip()
+            st.rerun()
+    st.markdown('</div>', unsafe_allow_html=True)
     st.stop()
 
 
