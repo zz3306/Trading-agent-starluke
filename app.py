@@ -241,7 +241,50 @@ def _get_reports_dir() -> Path:
     except Exception:
         return Path("reports")
 
+_SECTIONS = [
+    ("I · Analysts",  "1_analysts",  "bar-chart", [
+        ("market",       "📈 Market"),
+        ("news",         "📰 News"),
+        ("fundamentals", "🏢 Fundamentals"),
+        ("valuation",    "🔢 Valuation"),
+        ("macro",        "🌐 Macro"),
+        ("sentiment",    "💬 Sentiment"),
+        ("options",      "💵 Options"),
+    ]),
+    ("II · Research", "2_research",  "people", [
+        ("bull",    "🟢 Bull"),
+        ("bear",    "🔴 Bear"),
+        ("manager", "👔 Research Mgr"),
+    ]),
+    ("III · Trading", "3_trading",   "graph-up-arrow", [
+        ("trader",  "🤝 Trader"),
+    ]),
+    ("IV · Risk",     "4_risk",      "shield-exclamation", [
+        ("aggressive",   "🔴 Aggressive"),
+        ("conservative", "🟢 Conservative"),
+        ("neutral",      "🟡 Neutral"),
+    ]),
+    ("V · Portfolio", "5_portfolio", "clipboard-check", [
+        ("decision", "🏆 Final Decision"),
+    ]),
+]
+
+
+def _read_signal_from_folder(base: Path) -> str:
+    """Extract BUY/HOLD/SELL from saved portfolio decision file."""
+    dec = base / "5_portfolio" / "decision.md"
+    if not dec.exists():
+        return "—"
+    txt = dec.read_text(encoding="utf-8").upper()
+    for w in ("STRONG BUY", "BUY"):
+        if w in txt: return "🟢 BUY"
+    for w in ("STRONG SELL", "SELL"):
+        if w in txt: return "🔴 SELL"
+    return "🟡 HOLD"
+
+
 def _render_browse_reports():
+    import shutil
     reports_dir = _get_reports_dir()
     if not reports_dir.exists():
         st.info("No reports saved yet. Run an analysis first.")
@@ -252,6 +295,96 @@ def _render_browse_reports():
         st.info("No reports saved yet.")
         return
 
+    # ── Mode selector ──────────────────────────────────────────────────────────
+    mode = sac.segmented(
+        items=[sac.SegmentedItem(label="📄 View Report"),
+               sac.SegmentedItem(label="📊 Compare Dates"),
+               sac.SegmentedItem(label="🗑️ Delete")],
+        label=None, size="xs", color="#36cfc9",
+    )
+
+    # ══════════════════════════════════════════════════════════════════════════
+    if mode == "🗑️ Delete":
+        st.warning("Select a report to permanently delete it.")
+        c1, c2 = st.columns([1, 1])
+        with c1:
+            del_ticker = st.selectbox("Ticker", tickers, key="del_tick")
+        ticker_dir = reports_dir / del_ticker
+        dates = sorted([p.name for p in ticker_dir.iterdir() if p.is_dir()], reverse=True)
+        if not dates:
+            st.info("No reports for this ticker.")
+            return
+        with c2:
+            del_date = st.selectbox("Date", dates, key="del_date")
+        target = ticker_dir / del_date
+        st.markdown(f"**Will delete:** `{target}`")
+        if st.button("🗑️ Confirm Delete", type="primary"):
+            shutil.rmtree(target, ignore_errors=True)
+            # remove ticker folder too if now empty
+            remaining = [p for p in ticker_dir.iterdir() if p.is_dir()]
+            if not remaining:
+                ticker_dir.rmdir()
+            st.success(f"Deleted {del_ticker} / {del_date}")
+            st.rerun()
+        return
+
+    # ══════════════════════════════════════════════════════════════════════════
+    if mode == "📊 Compare Dates":
+        c1, c2 = st.columns([1, 2])
+        with c1:
+            cmp_ticker = st.selectbox("Ticker", tickers, key="cmp_tick")
+        ticker_dir = reports_dir / cmp_ticker
+        dates = sorted([p.name for p in ticker_dir.iterdir() if p.is_dir()], reverse=True)
+        if len(dates) < 2:
+            st.info("Need at least 2 saved dates for the same ticker to compare.")
+            return
+        with c2:
+            cmp_dates = st.multiselect("Select dates to compare", dates,
+                                       default=dates[:min(3, len(dates))])
+        if not cmp_dates:
+            return
+
+        # Signal summary row
+        st.markdown("#### Signal History")
+        sig_cols = st.columns(len(cmp_dates))
+        for i, d in enumerate(sorted(cmp_dates)):
+            sig = _read_signal_from_folder(ticker_dir / d)
+            sig_cols[i].metric(d, sig)
+
+        st.divider()
+
+        # Section picker for side-by-side content
+        sec_label = st.selectbox(
+            "Section to compare",
+            [lbl for lbl, _, _, _ in _SECTIONS],
+        )
+        sec_folder, sec_files = next(
+            (f, fs) for lbl, f, _, fs in _SECTIONS if lbl == sec_label
+        )
+
+        available_stems = [(stem, title) for stem, title in sec_files]
+        if len(available_stems) > 1:
+            file_choice = st.radio(
+                "File", [t for _, t in available_stems], horizontal=True
+            )
+            chosen_stem = next(s for s, t in available_stems if t == file_choice)
+        else:
+            chosen_stem = available_stems[0][0]
+
+        sorted_dates = sorted(cmp_dates)
+        cols = st.columns(len(sorted_dates))
+        for i, d in enumerate(sorted_dates):
+            with cols[i]:
+                st.markdown(f"**{d}**")
+                fpath = ticker_dir / d / sec_folder / f"{chosen_stem}.md"
+                if fpath.exists():
+                    st.markdown(fpath.read_text(encoding="utf-8"))
+                else:
+                    st.caption("_Not available_")
+        return
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # Default: View Report
     c1, c2 = st.columns([1, 1])
     with c1:
         selected_ticker = st.selectbox("Ticker", tickers)
@@ -263,62 +396,31 @@ def _render_browse_reports():
     with c2:
         selected_date = st.selectbox("Date", dates)
 
+    # overwrite notice
+    st.caption(
+        f"💡 Re-running **{selected_ticker}** on **{selected_date}** will overwrite this report. "
+        "Use a different date to keep both."
+    )
+
     base = ticker_dir / selected_date
-
-    # ── Five-section tabs ──────────────────────────────────────────────────────
-    _SECTIONS = [
-        ("I · Analysts",   "1_analysts",  "bar-chart",       [
-            ("market",       "📈 Market"),
-            ("news",         "📰 News"),
-            ("fundamentals", "🏢 Fundamentals"),
-            ("valuation",    "🔢 Valuation"),
-            ("macro",        "🌐 Macro"),
-            ("sentiment",    "💬 Sentiment"),
-            ("options",      "💵 Options"),
-        ]),
-        ("II · Research",  "2_research",  "people",          [
-            ("bull",    "🟢 Bull Researcher"),
-            ("bear",    "🔴 Bear Researcher"),
-            ("manager", "👔 Research Manager"),
-        ]),
-        ("III · Trading",  "3_trading",   "graph-up-arrow",  [
-            ("trader",  "🤝 Trader"),
-        ]),
-        ("IV · Risk",      "4_risk",      "shield-exclamation", [
-            ("aggressive",   "🔴 Aggressive"),
-            ("conservative", "🟢 Conservative"),
-            ("neutral",      "🟡 Neutral"),
-        ]),
-        ("V · Portfolio",  "5_portfolio", "clipboard-check", [
-            ("decision", "🏆 Final Decision"),
-        ]),
-    ]
-
     section_tab = sac.tabs(
         [sac.TabsItem(label, icon=icon) for label, _, icon, _ in _SECTIONS],
         color="#36cfc9", size="sm", align="start",
     )
-
     for label, folder, _, files in _SECTIONS:
         if section_tab != label:
             continue
         section_dir = base / folder
         if not section_dir.exists():
-            st.info(f"No {label} data found for {selected_ticker} / {selected_date}.")
+            st.info(f"No data for {label}.")
             break
-
-        # If only one file, show it directly; otherwise show sub-tabs
         available = [(stem, title) for stem, title in files
                      if (section_dir / f"{stem}.md").exists()]
-
         if not available:
             st.info("No files saved for this section.")
             break
-
         if len(available) == 1:
-            stem, title = available[0]
-            st.markdown(f"#### {title}")
-            st.markdown((section_dir / f"{stem}.md").read_text(encoding="utf-8"))
+            st.markdown((section_dir / f"{available[0][0]}.md").read_text(encoding="utf-8"))
         else:
             sub_tab = sac.tabs(
                 [sac.TabsItem(title) for _, title in available],
@@ -573,8 +675,20 @@ with st.sidebar:
 
 
 # ── MAIN AREA ──────────────────────────────────────────────────────────────────
-# Hero banner
+# Hero banner — theme-aware background
 if _logo_b64:
+    _banner_bg = {
+        "dark":    "linear-gradient(160deg, #050a10 0%, #0c1826 50%, #050a10 100%)",
+        "light":   "linear-gradient(160deg, #e8f0fe 0%, #dbeafe 50%, #e8f0fe 100%)",
+        "rainbow": "linear-gradient(160deg, #0a0010 0%, #100818 40%, #0a100a 100%)",
+    }[st.session_state.theme]
+    _banner_blend = "multiply" if st.session_state.theme == "light" else "screen"
+    _banner_glow  = {
+        "dark":    "drop-shadow(0 0 40px #36cfc966)",
+        "light":   "drop-shadow(0 0 24px #0066cc55)",
+        "rainbow": "drop-shadow(0 0 40px #ff33ff66)",
+    }[st.session_state.theme]
+
     st.markdown(f"""
     <style>
     .hero-banner {{
@@ -587,10 +701,9 @@ if _logo_b64:
         align-items: center;
         justify-content: center;
         min-height: 220px;
-        background: linear-gradient(160deg, #050a10 0%, #0c1826 50%, #050a10 100%);
+        background: {_banner_bg};
         border: 1px solid var(--sl-border);
     }}
-    /* ghost logo tiled in background */
     .hero-banner::before {{
         content: "";
         position: absolute;
@@ -602,7 +715,6 @@ if _logo_b64:
         opacity: 0.07;
         filter: blur(1px);
     }}
-    /* foreground logo — strip white box with mix-blend */
     .hero-banner img {{
         position: relative;
         z-index: 1;
@@ -610,8 +722,8 @@ if _logo_b64:
         max-width: 740px;
         min-width: 280px;
         height: auto;
-        mix-blend-mode: screen;
-        filter: drop-shadow(0 0 40px #36cfc966) brightness(1.1);
+        mix-blend-mode: {_banner_blend};
+        filter: {_banner_glow} brightness(1.05);
     }}
     </style>
     <div class="hero-banner">
