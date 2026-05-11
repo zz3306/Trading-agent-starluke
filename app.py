@@ -14,8 +14,13 @@ import streamlit_antd_components as sac
 
 os.environ.setdefault("PYTHONUTF8", "1")
 
-_LOGO = Path(__file__).parent / "assets" / "Starluke.png"
-_logo_b64 = base64.b64encode(_LOGO.read_bytes()).decode() if _LOGO.exists() else ""
+def _img_b64(name: str) -> str:
+    p = Path(__file__).parent / "assets" / name
+    return base64.b64encode(p.read_bytes()).decode() if p.exists() else ""
+
+_logo_b64   = _img_b64("Starluke.png")
+_bg_b64     = _img_b64("Cominc3.png")
+_illus_b64  = _img_b64("1.png")
 
 # ── Page config ────────────────────────────────────────────────────────────────
 st.set_page_config(
@@ -137,20 +142,55 @@ if "saas_running"  not in st.session_state: st.session_state.saas_running  = Fal
 _css_map = {"dark": DARK_CSS, "light": LIGHT_CSS, "rainbow": RAINBOW_CSS}
 st.markdown(f"<style>{_css_map[st.session_state.theme]}</style>", unsafe_allow_html=True)
 
+# Background image (Cominc3.png) with per-theme overlay
+if _bg_b64:
+    _bg_opacity = {"dark": "0.13", "light": "0.10", "rainbow": "0.11"}[st.session_state.theme]
+    st.markdown(f"""
+    <style>
+    [data-testid="stAppViewContainer"]::before {{
+        content: "";
+        position: fixed;
+        inset: 0;
+        background-image: url("data:image/png;base64,{_bg_b64}");
+        background-size: cover;
+        background-position: center;
+        background-attachment: fixed;
+        opacity: {_bg_opacity};
+        pointer-events: none;
+        z-index: 0;
+    }}
+    [data-testid="stMain"] > div {{ position: relative; z-index: 1; }}
+    </style>
+    """, unsafe_allow_html=True)
+
 # ── Welcome screen ─────────────────────────────────────────────────────────────
 if not st.session_state.username:
-    st.markdown("""
+    _bg_style = (
+        f'background-image:url("data:image/png;base64,{_bg_b64}");'
+        'background-size:cover;background-position:center;'
+        if _bg_b64 else ""
+    )
+    st.markdown(f"""
     <style>
-    [data-testid="stSidebar"] { display: none; }
-    .welcome-wrap {
+    [data-testid="stSidebar"] {{ display: none; }}
+    [data-testid="stAppViewContainer"] {{
+        {_bg_style}
+    }}
+    [data-testid="stAppViewContainer"]::after {{
+        content:""; position:fixed; inset:0;
+        background:rgba(0,0,0,0.62); pointer-events:none; z-index:0;
+    }}
+    .welcome-wrap {{
+        position:relative; z-index:1;
         display: flex; flex-direction: column; align-items: center;
         justify-content: center; min-height: 80vh; gap: 24px;
-    }
-    .welcome-wrap img { width: 340px; margin-bottom: 8px; }
-    .welcome-title {
-        font-size: 1.1rem; color: #888;
+    }}
+    .welcome-wrap img {{ width: 340px; margin-bottom: 8px; }}
+    .welcome-title {{
+        font-size: 1.1rem; color: #ccc;
         letter-spacing: 4px; text-transform: uppercase;
-    }
+    }}
+    [data-testid="stMain"] > div {{ position:relative; z-index:1; }}
     </style>
     """, unsafe_allow_html=True)
 
@@ -468,12 +508,44 @@ with st.sidebar:
 
 
 # ── MAIN AREA ──────────────────────────────────────────────────────────────────
-# Header
+# Hero banner — STARLUKE logo as top background
 if _logo_b64:
     st.markdown(f"""
-    <div class="main-header">
+    <style>
+    .hero-banner {{
+        position: relative;
+        width: 100%;
+        border-radius: 14px;
+        overflow: hidden;
+        margin-bottom: 24px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 110px;
+        background: linear-gradient(135deg, #0a0a0a 0%, #111827 60%, #0a0a0a 100%);
+        border: 1px solid var(--sl-border);
+    }}
+    .hero-banner::before {{
+        content: "";
+        position: absolute;
+        inset: 0;
+        background-image: url("data:image/png;base64,{_logo_b64}");
+        background-size: contain;
+        background-repeat: no-repeat;
+        background-position: center;
+        opacity: 0.18;
+    }}
+    .hero-banner img {{
+        position: relative;
+        z-index: 1;
+        max-height: 90px;
+        width: auto;
+        max-width: 520px;
+        filter: drop-shadow(0 0 24px #36cfc955);
+    }}
+    </style>
+    <div class="hero-banner">
         <img src="data:image/png;base64,{_logo_b64}" alt="STARLUKE">
-        <div class="main-header-sub">Multi-Agent Stock Analysis</div>
     </div>
     """, unsafe_allow_html=True)
 
@@ -515,6 +587,17 @@ else:
     if result is None:
         # Landing
         st.info("Configure your analysis in the sidebar and click **Run Analysis**.")
+
+        # Illustration
+        if _illus_b64:
+            st.markdown(f"""
+            <div style="text-align:center; margin: 16px 0 24px;">
+                <img src="data:image/png;base64,{_illus_b64}"
+                     style="max-width:680px; width:100%; border-radius:12px;
+                            opacity:0.92; filter:drop-shadow(0 4px 24px #0008);">
+            </div>
+            """, unsafe_allow_html=True)
+
         col1, col2 = st.columns(2)
         with col1:
             st.markdown("""
