@@ -1341,33 +1341,38 @@ else:
         _elapsed = int(time.time() - st.session_state.get("_run_started", time.time()))
         _mins, _secs = divmod(_elapsed, 60)
 
-        st.markdown(
-            f"<h3 style='margin-bottom:4px;'>⏳ {t('analyzing')} <span style='color:#36cfc9'>{_ticker}</span>"
-            f" &nbsp;·&nbsp; {_rdate}</h3>"
-            f"<div style='color:var(--sl-muted);font-size:0.85rem;margin-bottom:16px;'>"
-            f"{t('elapsed')}: {_mins:02d}:{_secs:02d} &nbsp;·&nbsp; {len(_prog)}/{_total} {t('steps')}</div>",
-            unsafe_allow_html=True,
-        )
-        st.progress(min(len(_prog) / max(_total, 1), 0.99))
-
-        if _prog:
-            _done_html = "".join(
-                f"<div style='padding:3px 0;font-size:0.88rem;'>✅ {s}</div>"
-                for s in _prog[:-1]
-            )
-            _done_html += (
-                f"<div style='padding:4px 0;font-size:0.92rem;font-weight:600;"
-                f"color:#36cfc9;'>⚙️ {_prog[-1]} &nbsp;<span style='opacity:0.6;font-size:0.8rem;'>running…</span></div>"
-            )
+        # Wrap all dynamic content in a single st.empty() so Streamlit
+        # replaces ONE node on each rerun instead of removing/adding several
+        # — prevents the React "removeChild" DOM crash on rapid reruns.
+        _prog_slot = st.empty()
+        with _prog_slot.container():
             st.markdown(
-                f"<div style='border:1px solid var(--sl-border);border-radius:10px;"
-                f"padding:12px 18px;margin-top:8px;'>{_done_html}</div>",
+                f"<h3 style='margin-bottom:4px;'>⏳ {t('analyzing')} <span style='color:#36cfc9'>{_ticker}</span>"
+                f" &nbsp;·&nbsp; {_rdate}</h3>"
+                f"<div style='color:var(--sl-muted);font-size:0.85rem;margin-bottom:16px;'>"
+                f"{t('elapsed')}: {_mins:02d}:{_secs:02d} &nbsp;·&nbsp; {len(_prog)}/{_total} {t('steps')}</div>",
                 unsafe_allow_html=True,
             )
-        else:
-            st.markdown(f"<div style='color:var(--sl-muted);font-size:0.88rem;'>{t('initializing')}</div>", unsafe_allow_html=True)
+            st.progress(min(len(_prog) / max(_total, 1), 0.99))
 
-        time.sleep(2)
+            if _prog:
+                _done_html = "".join(
+                    f"<div style='padding:3px 0;font-size:0.88rem;'>✅ {s}</div>"
+                    for s in _prog[:-1]
+                )
+                _done_html += (
+                    f"<div style='padding:4px 0;font-size:0.92rem;font-weight:600;"
+                    f"color:#36cfc9;'>⚙️ {_prog[-1]} &nbsp;<span style='opacity:0.6;font-size:0.8rem;'>running…</span></div>"
+                )
+                st.markdown(
+                    f"<div style='border:1px solid var(--sl-border);border-radius:10px;"
+                    f"padding:12px 18px;margin-top:8px;'>{_done_html}</div>",
+                    unsafe_allow_html=True,
+                )
+            else:
+                st.markdown(f"<div style='color:var(--sl-muted);font-size:0.88rem;'>{t('initializing')}</div>", unsafe_allow_html=True)
+
+        time.sleep(3)
         st.rerun()
 
     elif result is None:
