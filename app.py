@@ -726,14 +726,16 @@ def _render_saas_finder_page():
 
 
 def run_analysis(ticker, trade_date, analysts, result_holder,
-                 quick_model="claude-cli", deep_model="claude-cli"):
+                 quick_model="claude-cli", deep_model="claude-cli",
+                 output_language="English"):
     try:
         from tradingagents.graph.trading_graph import TradingAgentsGraph
         from tradingagents.default_config import DEFAULT_CONFIG
         config = DEFAULT_CONFIG.copy()
         config.update({"max_debate_rounds": 1, "max_risk_discuss_rounds": 1,
                         "selected_analysts": analysts,
-                        "quick_think_llm": quick_model, "deep_think_llm": deep_model})
+                        "quick_think_llm": quick_model, "deep_think_llm": deep_model,
+                        "output_language": output_language})
         ta = TradingAgentsGraph(debug=False, config=config)
         final_state, signal = ta.propagate(ticker, str(trade_date))
         from cli.main import save_report_to_disk, extract_and_save_summary
@@ -847,6 +849,17 @@ with st.sidebar:
     quick_model = dict(_qopts)[st.selectbox("Quick (analysts)", [l for l,_ in _qopts], index=0)]
     deep_model  = dict(_dopts)[st.selectbox("Deep (PM & research)", [l for l,_ in _dopts], index=0)]
 
+    sac.divider(label="Output Language", align="center", color="#333")
+    lang_choice = sac.segmented(
+        items=[
+            sac.SegmentedItem(label="🇺🇸 English"),
+            sac.SegmentedItem(label="🇨🇳 中文"),
+        ],
+        label=None, size="xs", color="#36cfc9", use_container_width=True,
+        index=0,
+    )
+    output_language = "Chinese" if lang_choice == "🇨🇳 中文" else "English"
+
     st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
 
     run_btn = st.button(
@@ -927,7 +940,7 @@ if run_btn and not st.session_state.running:
     result_holder = {}
     thread = threading.Thread(
         target=run_analysis,
-        args=(ticker, trade_date, selected_analysts, result_holder, quick_model, deep_model),
+        args=(ticker, trade_date, selected_analysts, result_holder, quick_model, deep_model, output_language),
         daemon=True,
     )
     thread.start()
