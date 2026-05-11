@@ -170,39 +170,64 @@ if not st.session_state.username:
     <style>
     [data-testid="stSidebar"] {{ display: none !important; }}
 
-    /* full-screen background + dark overlay */
-    [data-testid="stAppViewContainer"] {{
-        background-image: {_bg_url};
-        background-size: cover;
-        background-position: center;
+    /* background fills full viewport at high opacity */
+    html, body, [data-testid="stAppViewContainer"] {{
+        background-image: {_bg_url} !important;
+        background-size: cover !important;
+        background-position: center !important;
+        background-repeat: no-repeat !important;
+        background-attachment: fixed !important;
+        min-height: 100vh !important;
     }}
+
+    /* thin dark vignette — just enough for readability */
     [data-testid="stAppViewContainer"]::after {{
-        content:""; position:fixed; inset:0;
-        background:rgba(0,0,0,0.68);
-        pointer-events:none; z-index:0;
+        content: "";
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.35);
+        pointer-events: none;
+        z-index: 0;
     }}
 
-    /* push the block container down so everything sits in the vertical center */
+    /* strip Streamlit's own background */
+    [data-testid="stMain"],
+    [data-testid="stMain"] > div {{
+        background: transparent !important;
+    }}
+
+    /* center the card */
     [data-testid="block-container"] {{
-        padding-top: 12vh !important;
-        max-width: 520px !important;
-        position: relative; z-index: 1;
+        padding-top: 10vh !important;
+        max-width: 500px !important;
+        position: relative;
+        z-index: 1;
     }}
 
-    /* logo: fill the column, centered */
+    /* frosted glass card */
+    [data-testid="block-container"] > div:first-child {{
+        background: rgba(8, 12, 20, 0.55) !important;
+        border: 1px solid rgba(255,255,255,0.13) !important;
+        border-radius: 20px !important;
+        padding: 36px 40px 32px !important;
+        backdrop-filter: blur(16px) !important;
+        -webkit-backdrop-filter: blur(16px) !important;
+        box-shadow: 0 8px 48px rgba(0,0,0,0.5) !important;
+    }}
+
     .wc-logo {{
         display: block;
         width: 100%;
-        max-width: 480px;
-        margin: 0 auto 4px;
-        filter: drop-shadow(0 0 28px #36cfc966);
+        max-width: 460px;
+        margin: 0 auto 6px;
+        filter: drop-shadow(0 0 32px #36cfc977);
     }}
     .wc-sub {{
         text-align: center;
-        font-size: 0.72rem;
+        font-size: 0.7rem;
         letter-spacing: 5px;
         text-transform: uppercase;
-        color: #aaa;
+        color: #ccc;
         margin-bottom: 28px;
     }}
     </style>
