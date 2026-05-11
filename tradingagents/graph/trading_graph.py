@@ -36,7 +36,9 @@ from tradingagents.agents.utils.agent_utils import (
     get_income_statement,
     get_news,
     get_insider_transactions,
-    get_global_news
+    get_global_news,
+    get_options_chain,
+    get_stock_price_for_options,
 )
 from tradingagents.agents.analysts.macro_analyst import fetch_macro_data
 
@@ -206,6 +208,13 @@ class TradingAgentsGraph:
                 [
                     # Macro economic indicator tool
                     fetch_macro_data,
+                ]
+            ),
+            "options": ToolNode(
+                [
+                    # Options chain tools for LEAP analysis
+                    get_options_chain,
+                    get_stock_price_for_options,
                 ]
             ),
         }
@@ -383,6 +392,7 @@ class TradingAgentsGraph:
             "news_report": final_state["news_report"],
             "fundamentals_report": final_state["fundamentals_report"],
             "valuation_report": final_state.get("valuation_report", ""),
+            "options_report": final_state.get("options_report", ""),
             "investment_debate_state": {
                 "bull_history": final_state["investment_debate_state"]["bull_history"],
                 "bear_history": final_state["investment_debate_state"]["bear_history"],

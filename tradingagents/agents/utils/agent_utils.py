@@ -18,6 +18,10 @@ from tradingagents.agents.utils.news_data_tools import (
     get_insider_transactions,
     get_global_news
 )
+from tradingagents.agents.utils.options_tools import (
+    get_options_chain,
+    get_stock_price_for_options,
+)
 
 
 def get_language_instruction() -> str:

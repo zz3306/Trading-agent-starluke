@@ -53,6 +53,10 @@ class GraphSetup:
         if "macro" in ordered:
             ordered.remove("macro")
             ordered.append("macro")
+        # Options runs last so it has all analyst context available in state
+        if "options" in ordered:
+            ordered.remove("options")
+            ordered.append("options")
         selected_analysts = ordered
 
         # Create analyst nodes
@@ -99,6 +103,11 @@ class GraphSetup:
             analyst_nodes["macro"] = create_macro_analyst(self.quick_thinking_llm)
             delete_nodes["macro"] = create_msg_delete()
             tool_nodes["macro"] = self.tool_nodes["macro"]
+
+        if "options" in selected_analysts:
+            analyst_nodes["options"] = create_options_analyst(self.quick_thinking_llm)
+            delete_nodes["options"] = create_msg_delete()
+            tool_nodes["options"] = self.tool_nodes["options"]
 
         # Create researcher and manager nodes
         bull_researcher_node = create_bull_researcher(self.quick_thinking_llm)

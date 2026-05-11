@@ -1320,5 +1320,100 @@ def analyze(
     run_analysis(checkpoint=checkpoint)
 
 
+@app.command(name="saas-finder")
+def saas_finder_cmd(
+    n: int = typer.Option(5, "--count", "-n", help="Number of companies to find (1–20)"),
+    sector: str = typer.Option("", "--sector", "-s", help="Optional sector filter, e.g. 'Fintech'"),
+    model: str = typer.Option("claude-sonnet-4-6", "--model", "-m", help="Claude model to use"),
+    no_save: bool = typer.Option(False, "--no-save", help="Skip saving results to disk"),
+):
+    """Find top SaaS companies by 护城河四维度 (Four-Dimension Moat) score."""
+    from tradingagents.saas_finder import run_saas_finder
+
+    rainbow_title = make_rainbow_text("  ★  STARLUKE SaaS Finder  ★  ")
+    console.print(Panel(rainbow_title, border_style="cyan", expand=False))
+    console.print(
+        f"[cyan]Scanning for top [bold]{n}[/bold] SaaS moat candidates"
+        + (f" in [bold]{sector}[/bold]" if sector else "")
+        + "…[/cyan]\n"
+    )
+
+    messages = []
+
+    def _cb(msg: str):
+        messages.append(msg)
+        console.print(f"  [dim]› {msg}[/dim]")
+
+    try:
+        results = run_saas_finder(
+            n=n,
+            sector_hint=sector,
+            model=model,
+            progress_cb=_cb,
+            save=not no_save,
+        )
+    except Exception as e:
+        console.print(f"[red]Error: {e}[/red]")
+        raise typer.Exit(1)
+
+    if not results:
+        console.print("[yellow]No results returned.[/yellow]")
+        return
+
+    # Summary table
+    table = Table(
+        title=f"Top {len(results)} SaaS Moat Companies",
+        box=box.ROUNDED,
+        show_header=True,
+        header_style="bold cyan",
+    )
+    table.add_column("Ticker",       style="bold white",  width=8)
+    table.add_column("Company",      style="white",       width=28)
+    table.add_column("Sector",       style="dim white",   width=14)
+    table.add_column("Distrib",      justify="center",    width=8)
+    table.add_column("Data",         justify="center",    width=6)
+    table.add_column("Integr",       justify="center",    width=7)
+    table.add_column("Reg",          justify="center",    width=5)
+    table.add_column("Total",        justify="center",    width=7)
+    table.add_column("AI Stance",    style="dim",         width=10)
+
+    for r in results:
+        total = r.get("moat_total", 0)
+        total_style = "green bold" if total >= 30 else ("yellow" if total >= 22 else "red")
+        table.add_row(
+            r.get("ticker", "?"),
+            r.get("company", "?")[:27],
+            r.get("sector", "?")[:13],
+            str(r.get("moat_distribution", "?")),
+            str(r.get("moat_data", "?")),
+            str(r.get("moat_integration", "?")),
+            str(r.get("moat_regulatory", "?")),
+            f"[{total_style}]{total}/40[/{total_style}]",
+            r.get("ai_stance", "?"),
+        )
+
+    console.print(table)
+    console.print()
+
+    # Detail panels
+    for r in results:
+        ticker = r.get("ticker", "?")
+        company = r.get("company", "?")
+        thesis = r.get("core_thesis", "N/A")
+        risk = r.get("key_risk", "N/A")
+        ai_data = r.get("ai_data_advantage", "N/A")
+        ai_threat = r.get("ai_threat", "N/A")
+
+        detail = (
+            f"[bold cyan]Thesis:[/bold cyan] {thesis}\n"
+            f"[bold yellow]Risk:[/bold yellow] {risk}\n"
+            f"[dim]AI Data Advantage: {ai_data}  |  AI Threat: {ai_threat}[/dim]"
+        )
+        console.print(Panel(detail, title=f"[bold]{ticker}[/bold] — {company}", border_style="dim"))
+
+    if not no_save:
+        console.print("\n[green]✓ Results saved to reports/saas_finder/[/green]")
+
+
 if __name__ == "__main__":
     app()

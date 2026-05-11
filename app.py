@@ -125,11 +125,13 @@ hr { border-color:#1f1f1f !important; }
 """
 
 # ── Session state ──────────────────────────────────────────────────────────────
-if "theme"    not in st.session_state: st.session_state.theme    = "dark"
-if "result"   not in st.session_state: st.session_state.result   = None
-if "running"  not in st.session_state: st.session_state.running  = False
-if "nav"      not in st.session_state: st.session_state.nav      = "New Analysis"
-if "username" not in st.session_state: st.session_state.username = ""
+if "theme"         not in st.session_state: st.session_state.theme         = "dark"
+if "result"        not in st.session_state: st.session_state.result        = None
+if "running"       not in st.session_state: st.session_state.running       = False
+if "nav"           not in st.session_state: st.session_state.nav           = "New Analysis"
+if "username"      not in st.session_state: st.session_state.username      = ""
+if "saas_results"  not in st.session_state: st.session_state.saas_results  = None
+if "saas_running"  not in st.session_state: st.session_state.saas_running  = False
 
 # Inject active theme
 _css_map = {"dark": DARK_CSS, "light": LIGHT_CSS, "rainbow": RAINBOW_CSS}
@@ -248,6 +250,98 @@ def _render_signal_log():
     except Exception as e:
         st.error(f"Could not read signal log: {e}")
 
+def _render_saas_finder_page():
+    st.markdown("### 🔍 SaaS Finder — 护城河四维度 Moat Scanner")
+    st.caption(
+        "Uses Claude to identify publicly-traded SaaS companies with the strongest moats "
+        "across four dimensions: Distribution · Proprietary Data · Integration · Regulatory."
+    )
+
+    with st.form("saas_finder_form"):
+        col1, col2 = st.columns([2, 3])
+        with col1:
+            n = st.slider("Number of companies", min_value=1, max_value=15, value=5)
+        with col2:
+            sector_hint = st.text_input(
+                "Sector filter (optional)",
+                placeholder="e.g. Fintech, HR-Tech, DevOps, Healthcare",
+            )
+        submitted = st.form_submit_button("🔍 Find SaaS Moats", type="primary", use_container_width=True)
+
+    if submitted and not st.session_state.saas_running:
+        st.session_state.saas_results = None
+        st.session_state.saas_running = True
+        status_box = st.empty()
+        messages = []
+
+        def _cb(msg: str):
+            messages.append(msg)
+            status_box.info("  \n".join(messages))
+
+        try:
+            from tradingagents.saas_finder import run_saas_finder
+            with st.spinner("Running SaaS Finder analysis… (may take 1–2 min)"):
+                results = run_saas_finder(
+                    n=n,
+                    sector_hint=sector_hint.strip(),
+                    progress_cb=_cb,
+                )
+            st.session_state.saas_results = results
+        except Exception as e:
+            st.error(f"SaaS Finder error: {e}")
+        finally:
+            st.session_state.saas_running = False
+            status_box.empty()
+
+    results = st.session_state.saas_results
+    if results:
+        import pandas as pd
+
+        st.markdown(f"#### Top {len(results)} Companies by Moat Score")
+
+        rows = []
+        for r in results:
+            rows.append({
+                "Ticker":       r.get("ticker", "?"),
+                "Company":      r.get("company", "?"),
+                "Sector":       r.get("sector", "?"),
+                "Distribution": r.get("moat_distribution", 0),
+                "Data":         r.get("moat_data", 0),
+                "Integration":  r.get("moat_integration", 0),
+                "Regulatory":   r.get("moat_regulatory", 0),
+                "Total /40":    r.get("moat_total", 0),
+                "AI Stance":    r.get("ai_stance", "?"),
+            })
+        df = pd.DataFrame(rows)
+
+        def _color_total(val):
+            if isinstance(val, (int, float)):
+                if val >= 30: return "color:#00e676;font-weight:bold"
+                if val >= 22: return "color:#ffb800;font-weight:bold"
+                return "color:#ff5252"
+            return ""
+
+        st.dataframe(
+            df.style.applymap(_color_total, subset=["Total /40"]),
+            use_container_width=True,
+        )
+
+        st.divider()
+        st.markdown("#### Detailed Analysis")
+        for r in results:
+            with st.expander(f"**{r.get('ticker','?')}** — {r.get('company','?')} (Total: {r.get('moat_total',0)}/40)"):
+                c1, c2, c3, c4 = st.columns(4)
+                c1.metric("Distribution",  f"{r.get('moat_distribution', 0)}/10")
+                c2.metric("Data",          f"{r.get('moat_data', 0)}/10")
+                c3.metric("Integration",   f"{r.get('moat_integration', 0)}/10")
+                c4.metric("Regulatory",    f"{r.get('moat_regulatory', 0)}/10")
+
+                st.markdown(f"**Sector:** {r.get('sector','?')}  |  **AI Stance:** {r.get('ai_stance','?')}")
+                st.markdown(f"**AI Data Advantage:** {r.get('ai_data_advantage','?')}  |  **AI Threat:** {r.get('ai_threat','?')}")
+                st.info(f"**Core Thesis:** {r.get('core_thesis','?')}")
+                st.warning(f"**Key Risk:** {r.get('key_risk','?')}")
+
+
 def run_analysis(ticker, trade_date, analysts, result_holder,
                  quick_model="claude-cli", deep_model="claude-cli"):
     try:
@@ -310,6 +404,7 @@ with st.sidebar:
     # Navigation menu
     nav = sac.menu([
         sac.MenuItem("New Analysis",   icon="rocket-takeoff"),
+        sac.MenuItem("SaaS Finder",    icon="search"),
         sac.MenuItem("Browse Reports", icon="folder2-open"),
         sac.MenuItem("Signal Log",     icon="bar-chart-line"),
     ], color="#36cfc9", size="sm", indent=16, open_all=True)
@@ -338,6 +433,8 @@ with st.sidebar:
                                    help="Cached 7 days — very fast on repeats")
     use_social       = st.checkbox("Social (= News data)",    value=False,
                                    help="yfinance doesn't have Reddit/Twitter data")
+    use_options      = st.checkbox("Options (LEAP vs Stock)", value=False,
+                                   help="Fetches yfinance options chain, recommends LEAP vs buying stock")
 
     selected_analysts = (
         (["market"]       if use_market       else []) +
@@ -345,7 +442,8 @@ with st.sidebar:
         (["fundamentals"] if use_fundamentals else []) +
         (["valuation"]    if use_valuation    else []) +
         (["macro"]        if use_macro        else []) +
-        (["social"]       if use_social       else [])
+        (["social"]       if use_social       else []) +
+        (["options"]      if use_options      else [])
     )
 
     sac.divider(label="Model", align="center", color="#333")
@@ -406,6 +504,9 @@ if page == "Browse Reports":
 elif page == "Signal Log":
     st.markdown("### 📊 Signal Log")
     _render_signal_log()
+
+elif page == "SaaS Finder":
+    _render_saas_finder_page()
 
 else:
     # ── New Analysis page ──────────────────────────────────────────────────────
@@ -468,6 +569,7 @@ Macro   ┘       Trader
             sac.TabsItem("Fundamentals",      icon="building"),
             sac.TabsItem("Valuation",         icon="calculator"),
             sac.TabsItem("Macro",             icon="globe"),
+            sac.TabsItem("Options",           icon="currency-dollar"),
             sac.TabsItem("Sentiment",         icon="chat-square-text"),
             sac.TabsItem("Risk Debate",       icon="shield-exclamation"),
         ], color="#36cfc9", size="sm", align="start")
@@ -499,6 +601,9 @@ Macro   ┘       Trader
 
         elif tab == "Macro":
             show("macro_report", "_Macro analyst not selected._")
+
+        elif tab == "Options":
+            show("options_report", "_Options analyst not selected. Enable 'Options (LEAP vs Stock)' in the sidebar._")
 
         elif tab == "Sentiment":
             show("sentiment_report", "_Sentiment analyst not selected._")
