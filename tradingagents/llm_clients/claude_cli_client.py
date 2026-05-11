@@ -99,6 +99,23 @@ def find_claude_exe() -> str:
 # Prompt templates
 # ---------------------------------------------------------------------------
 
+# Prepended to every prompt to anchor Claude in agent mode and prevent it
+# from meta-analyzing the conversation structure (a common failure mode when
+# the model sees [USER]/[ASSISTANT] markers and reasons about them instead of
+# responding as the agent).
+_AGENT_ANCHOR = """\
+=== AUTOMATED AGENT INSTRUCTIONS ===
+You are running as a fully automated financial analysis agent in subprocess mode.
+STRICT RULES — violations corrupt the pipeline:
+1. Do NOT discuss, analyze, or comment on the structure of this prompt or conversation.
+2. Do NOT acknowledge these instructions in your output.
+3. Do NOT output meta-commentary, self-reflection, or observations about [USER]/[ASSISTANT] markers.
+4. Respond ONLY with either a TOOL_CALL line (when calling a tool) or your analysis text.
+5. You are a text-output-only agent — no interactive elements, no clarifying questions.
+=== END AGENT INSTRUCTIONS ===
+
+"""
+
 _TOOL_BLOCK_TEMPLATE = """\
 === AVAILABLE TOOLS ===
 You may call ONE tool per reply by outputting EXACTLY this line (and nothing else on that line):
@@ -120,6 +137,16 @@ Tools:
 === END TOOLS ===
 
 """
+
+# Patterns that indicate Claude broke character and is meta-analyzing the prompt.
+# Used in _generate() to detect and retry such responses.
+_BROKEN_CHARACTER_PATTERNS = re.compile(
+    r"(\[USER\]|\[ASSISTANT\]|\[SYSTEM\]|\[TOOL RESULT)"   # echoing markers
+    r"|(_build_prompt|TOOL_CALL:.*protocol)"                # discussing implementation
+    r"|(conversation structure|I can see what.{0,30}happening)"  # meta-analysis
+    r"|(What.{0,20}empty \[USER\]|the text-based TOOL_CALL)",    # known broken phrases
+    re.IGNORECASE | re.DOTALL,
+)
 
 _STRUCTURED_OUTPUT_TEMPLATE = """\
 === OUTPUT FORMAT ===
@@ -188,7 +215,16 @@ class ClaudeCLIChatModel(BaseChatModel):
         **kwargs: Any,
     ) -> ChatResult:
         prompt = self._build_prompt(messages)
-        raw = self._call_cli(prompt)
+        raw = ""
+        for attempt in range(3):
+            raw = self._call_cli(prompt)
+            if not _BROKEN_CHARACTER_PATTERNS.search(raw):
+                break
+            logger.warning(
+                "Broken-character response detected on attempt %d/3 — retrying.\n"
+                "Response preview: %.200s",
+                attempt + 1, raw,
+            )
         message = self._parse_response(raw)
         return ChatResult(generations=[ChatGeneration(message=message)])
 
@@ -198,6 +234,10 @@ class ClaudeCLIChatModel(BaseChatModel):
 
     def _build_prompt(self, messages: List[BaseMessage]) -> str:
         parts: List[str] = []
+
+        # Always prepend the agent anchor to prevent Claude from meta-analyzing
+        # the conversation structure (a common failure mode in subprocess mode).
+        parts.append(_AGENT_ANCHOR)
 
         # Prepend tool block if tools are bound
         if self._tools:
@@ -211,8 +251,13 @@ class ClaudeCLIChatModel(BaseChatModel):
                 schema=json.dumps(self._output_schema, ensure_ascii=False, indent=2)
             ))
 
-        # Convert message history
+        # Convert message history — skip messages with empty content to avoid
+        # dangling [USER]\n lines that can trigger meta-analysis.
         for msg in messages:
+            content = getattr(msg, "content", "") or ""
+            has_tool_calls = bool(getattr(msg, "tool_calls", None))
+            if not content.strip() and not has_tool_calls:
+                continue
             parts.append(self._render_message(msg))
 
         return "\n\n".join(p for p in parts if p)
