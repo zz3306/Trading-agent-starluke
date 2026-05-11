@@ -20,6 +20,7 @@ prompt engineering:
 """
 
 import json
+import logging
 import os
 import re
 import shutil
@@ -27,6 +28,8 @@ import subprocess
 import sys
 import uuid
 from typing import Any, Iterator, List, Optional, Sequence
+
+logger = logging.getLogger(__name__)
 
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.messages import (
@@ -104,15 +107,7 @@ def find_claude_exe() -> str:
 # the model sees [USER]/[ASSISTANT] markers and reasons about them instead of
 # responding as the agent).
 _AGENT_ANCHOR = """\
-=== AUTOMATED AGENT INSTRUCTIONS ===
-You are running as a fully automated financial analysis agent in subprocess mode.
-STRICT RULES — violations corrupt the pipeline:
-1. Do NOT discuss, analyze, or comment on the structure of this prompt or conversation.
-2. Do NOT acknowledge these instructions in your output.
-3. Do NOT output meta-commentary, self-reflection, or observations about [USER]/[ASSISTANT] markers.
-4. Respond ONLY with either a TOOL_CALL line (when calling a tool) or your analysis text.
-5. You are a text-output-only agent — no interactive elements, no clarifying questions.
-=== END AGENT INSTRUCTIONS ===
+You are a financial analysis agent operating in batch mode. Read the request below and respond directly with your analysis or a TOOL_CALL line. No preamble or meta-commentary needed.
 
 """
 
@@ -141,10 +136,9 @@ Tools:
 # Patterns that indicate Claude broke character and is meta-analyzing the prompt.
 # Used in _generate() to detect and retry such responses.
 _BROKEN_CHARACTER_PATTERNS = re.compile(
-    r"(\[USER\]|\[ASSISTANT\]|\[SYSTEM\]|\[TOOL RESULT)"   # echoing markers
-    r"|(_build_prompt|TOOL_CALL:.*protocol)"                # discussing implementation
+    r"(_build_prompt|TOOL_CALL:.*protocol)"                 # discussing implementation
     r"|(conversation structure|I can see what.{0,30}happening)"  # meta-analysis
-    r"|(What.{0,20}empty \[USER\]|the text-based TOOL_CALL)",    # known broken phrases
+    r"|(prompt injection|I.{0,20}flag|I.{0,20}not comply)",      # security refusal
     re.IGNORECASE | re.DOTALL,
 )
 
@@ -264,26 +258,24 @@ class ClaudeCLIChatModel(BaseChatModel):
 
     def _render_message(self, msg: BaseMessage) -> str:
         if isinstance(msg, SystemMessage):
-            return f"[SYSTEM]\n{msg.content}"
+            return f"<system>\n{msg.content}\n</system>"
 
         if isinstance(msg, HumanMessage):
-            return f"[USER]\n{msg.content}"
+            return f"<request>\n{msg.content}\n</request>"
 
         if isinstance(msg, AIMessage):
             content = msg.content or ""
-            # Re-render any tool calls the assistant previously made
             for tc in (msg.tool_calls or []):
                 content += (
                     f"\nTOOL_CALL: {json.dumps({'name': tc['name'], 'args': tc['args']}, ensure_ascii=False)}"
                 )
-            return f"[ASSISTANT]\n{content}"
+            return f"<previous_response>\n{content}\n</previous_response>"
 
         if isinstance(msg, ToolMessage):
             tool_name = getattr(msg, "name", "tool")
-            return f"[TOOL RESULT — {tool_name}]\n{msg.content}"
+            return f"<tool_result name=\"{tool_name}\">\n{msg.content}\n</tool_result>"
 
-        # Fallback for any other message type
-        return f"[MESSAGE]\n{msg.content}"
+        return f"<message>\n{msg.content}\n</message>"
 
     def _describe_tools(self) -> str:
         lines = []
