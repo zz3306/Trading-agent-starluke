@@ -312,7 +312,24 @@ class ClaudeCLIChatModel(BaseChatModel):
 
     def _call_cli(self, prompt: str) -> str:
         claude_exe = find_claude_exe()
-        extra_kwargs = {"creationflags": subprocess.CREATE_NO_WINDOW} if sys.platform == "win32" else {}
+
+        # Build a subprocess environment that includes the directories where
+        # claude lives, regardless of what the parent process inherited.
+        # This is the most reliable fix for Windows, where Python subprocesses
+        # often inherit a PATH that's missing npm/local-bin entries.
+        env = os.environ.copy()
+        home = os.path.expanduser("~")
+        _extra_paths = [
+            os.path.join(home, ".local", "bin"),
+            os.path.join(home, "AppData", "Roaming", "npm"),
+            os.path.join(home, "AppData", "Local", "Programs", "claude"),
+        ]
+        # Prepend extra paths so they take priority over the inherited PATH.
+        env["PATH"] = os.pathsep.join(_extra_paths) + os.pathsep + env.get("PATH", "")
+
+        extra_kwargs: dict = {"env": env}
+        if sys.platform == "win32":
+            extra_kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
 
         cmd = [claude_exe, "--output-format", "text"]
         if self.skip_permissions:
@@ -337,7 +354,11 @@ class ClaudeCLIChatModel(BaseChatModel):
             proc.communicate()
             return "[ERROR] Claude CLI timed out"
         except FileNotFoundError:
-            return "[ERROR] 'claude' command not found — make sure Claude Code CLI is installed and in PATH"
+            return (
+                f"[ERROR] 'claude' command not found at '{claude_exe}' — "
+                f"make sure Claude Code CLI is installed. "
+                f"PATH searched: {env['PATH'][:200]}"
+            )
 
         if proc.returncode != 0:
             return f"[ERROR] Claude CLI exit {proc.returncode}: {stderr.strip()}"
