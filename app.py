@@ -573,40 +573,45 @@ with st.sidebar:
 
 
 # ── MAIN AREA ──────────────────────────────────────────────────────────────────
-# Hero banner — STARLUKE logo as top background
+# Hero banner
 if _logo_b64:
     st.markdown(f"""
     <style>
     .hero-banner {{
         position: relative;
         width: 100%;
-        border-radius: 14px;
+        border-radius: 16px;
         overflow: hidden;
-        margin-bottom: 24px;
+        margin-bottom: 28px;
         display: flex;
         align-items: center;
         justify-content: center;
-        min-height: 110px;
-        background: linear-gradient(135deg, #0a0a0a 0%, #111827 60%, #0a0a0a 100%);
+        min-height: 220px;
+        background: linear-gradient(160deg, #050a10 0%, #0c1826 50%, #050a10 100%);
         border: 1px solid var(--sl-border);
     }}
+    /* ghost logo tiled in background */
     .hero-banner::before {{
         content: "";
         position: absolute;
         inset: 0;
         background-image: url("data:image/png;base64,{_logo_b64}");
-        background-size: contain;
+        background-size: 55%;
         background-repeat: no-repeat;
         background-position: center;
-        opacity: 0.18;
+        opacity: 0.07;
+        filter: blur(1px);
     }}
+    /* foreground logo — strip white box with mix-blend */
     .hero-banner img {{
         position: relative;
         z-index: 1;
-        max-height: 90px;
-        width: auto;
-        max-width: 520px;
-        filter: drop-shadow(0 0 24px #36cfc955);
+        width: 62%;
+        max-width: 740px;
+        min-width: 280px;
+        height: auto;
+        mix-blend-mode: screen;
+        filter: drop-shadow(0 0 40px #36cfc966) brightness(1.1);
     }}
     </style>
     <div class="hero-banner">
@@ -650,41 +655,44 @@ else:
     result = st.session_state.result
 
     if result is None:
-        # Landing
+        # Landing — one row: illustration | How it works | Agent pipeline
         st.info("Configure your analysis in the sidebar and click **Run Analysis**.")
 
-        # Illustration
-        if _illus_b64:
-            st.markdown(f"""
-            <div style="text-align:center; margin: 16px 0 24px;">
-                <img src="data:image/png;base64,{_illus_b64}"
-                     style="max-width:680px; width:100%; border-radius:12px;
-                            opacity:0.92; filter:drop-shadow(0 4px 24px #0008);">
-            </div>
-            """, unsafe_allow_html=True)
+        col_img, col_how, col_pipe = st.columns([1.5, 1, 1])
 
-        col1, col2 = st.columns(2)
-        with col1:
+        with col_img:
+            if _illus_b64:
+                st.markdown(f"""
+                <img src="data:image/png;base64,{_illus_b64}"
+                     style="width:100%; border-radius:12px; margin-top:8px;
+                            opacity:0.93; filter:drop-shadow(0 4px 20px #0009);">
+                """, unsafe_allow_html=True)
+
+        with col_how:
             st.markdown("""
 #### How it works
-1. **Analyst agents** pull real market data (yfinance, free)
-2. **Bull & Bear researchers** debate the investment thesis
-3. **Trader** converts research into a trade proposal
-4. **Risk team** stress-tests position sizing
-5. **Portfolio Manager** issues the final BUY / HOLD / SELL
+1. **Analysts** pull live market data
+2. **Bull & Bear** debate the thesis
+3. **Trader** builds a trade proposal
+4. **Risk team** stress-tests sizing
+5. **Portfolio Manager** → BUY / HOLD / SELL
             """)
-        with col2:
+
+        with col_pipe:
             st.markdown("""
 #### Agent pipeline
 ```
 Market  ┐
-News    ├─→ Bull/Bear → Research Mgr
-Fund.   │         ↓
-Macro   ┘       Trader
-                  ↓
-         Aggressive / Neutral / Conservative
-                  ↓
-           Portfolio Manager → VERDICT
+News    ├→ Bull/Bear
+Fund.   │     ↓
+Macro   ┘  Res. Mgr
+              ↓
+           Trader
+              ↓
+       Agg/Neu/Con
+              ↓
+        Port. Mgr
+           VERDICT
 ```
             """)
 
