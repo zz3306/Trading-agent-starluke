@@ -102,46 +102,6 @@ def find_claude_exe() -> str:
 # Prompt templates
 # ---------------------------------------------------------------------------
 
-# Prepended to every prompt to anchor Claude in agent mode and prevent it
-# from meta-analyzing the conversation structure (a common failure mode when
-# the model sees [USER]/[ASSISTANT] markers and reasons about them instead of
-# responding as the agent).
-_AGENT_ANCHOR = """\
-You are a financial analysis agent operating in batch mode. Read the request below and respond directly with your analysis or a TOOL_CALL line. No preamble or meta-commentary needed.
-
-"""
-
-_TOOL_BLOCK_TEMPLATE = """\
-=== AVAILABLE TOOLS ===
-You may call ONE tool per reply by outputting EXACTLY this line (and nothing else on that line):
-TOOL_CALL: {{"name": "<tool_name>", "args": {{<json arguments>}}}}
-
-Rules:
-- Output the TOOL_CALL line only when you need to call a tool.
-- Do NOT add any text on the same line as TOOL_CALL.
-- After receiving a tool result you may call another tool or write your final answer.
-- If you do not need a tool, just respond normally — no TOOL_CALL line.
-- CRITICAL: You are a pure text reasoning engine. Do NOT execute Python code, run shell
-  commands, or use any built-in Claude tools (Bash, Read, Write, WebSearch, etc.).
-  Do NOT attempt to fetch data yourself. ALL data retrieval must go through the
-  TOOL_CALL format above — the calling system will execute the actual function.
-  If you cannot call a tool, say so in plain text; never attempt direct code execution.
-
-Tools:
-{tool_descriptions}
-=== END TOOLS ===
-
-"""
-
-# Patterns that indicate Claude broke character and is meta-analyzing the prompt.
-# Used in _generate() to detect and retry such responses.
-_BROKEN_CHARACTER_PATTERNS = re.compile(
-    r"(_build_prompt|TOOL_CALL:.*protocol)"                 # discussing implementation
-    r"|(conversation structure|I can see what.{0,30}happening)"  # meta-analysis
-    r"|(prompt injection|I.{0,20}flag|I.{0,20}not comply)",      # security refusal
-    re.IGNORECASE | re.DOTALL,
-)
-
 _STRUCTURED_OUTPUT_TEMPLATE = """\
 === OUTPUT FORMAT ===
 Respond with a single JSON object that matches this schema (no markdown fences, no extra text):
@@ -208,19 +168,81 @@ class ClaudeCLIChatModel(BaseChatModel):
         run_manager: Any = None,
         **kwargs: Any,
     ) -> ChatResult:
+        # When tools are bound: pre-execute them in Python and inject results
+        # directly into the prompt. This avoids any custom TOOL_CALL text
+        # protocol, which Claude Code CLI's safety system flags as prompt
+        # injection (it correctly detects attempts to override its native tools).
+        if self._tools:
+            messages = self._prefetch_tool_results(messages)
+
         prompt = self._build_prompt(messages)
-        raw = ""
-        for attempt in range(3):
-            raw = self._call_cli(prompt)
-            if not _BROKEN_CHARACTER_PATTERNS.search(raw):
-                break
-            logger.warning(
-                "Broken-character response detected on attempt %d/3 — retrying.\n"
-                "Response preview: %.200s",
-                attempt + 1, raw,
-            )
+        raw = self._call_cli(prompt)
         message = self._parse_response(raw)
         return ChatResult(generations=[ChatGeneration(message=message)])
+
+    # ------------------------------------------------------------------
+    # Tool pre-fetching (claude_cli-specific agentic strategy)
+    # ------------------------------------------------------------------
+
+    def _prefetch_tool_results(self, messages: List[BaseMessage]) -> List[BaseMessage]:
+        """Execute all bound tools in Python and inject results as context.
+
+        Extracts ticker + date from the message content, calls every bound
+        tool with those parameters, and appends ToolMessages so Claude
+        receives the data and only needs to write the analysis.
+        """
+        # Pull all text for parameter extraction
+        full_text = " ".join(
+            str(getattr(m, "content", "") or "") for m in messages
+        )
+
+        # Extract YYYY-MM-DD date
+        date_match = re.search(r"\b(\d{4}-\d{2}-\d{2})\b", full_text)
+        curr_date = date_match.group(1) if date_match else ""
+
+        # Extract stock ticker (1-5 uppercase letters, optional .XX suffix)
+        ticker_match = re.search(r"\b([A-Z]{1,5}(?:\.[A-Z]{1,2})?)\b", full_text)
+        ticker = ticker_match.group(1) if ticker_match else ""
+
+        augmented = list(messages)
+        for tool in self._tools:
+            try:
+                args = self._infer_tool_args(tool, curr_date=curr_date, ticker=ticker)
+                result = tool.invoke(args)
+                augmented.append(
+                    ToolMessage(
+                        content=f"[Data from {tool.name}]\n{result}",
+                        tool_call_id=f"prefetch_{tool.name}",
+                        name=tool.name,
+                    )
+                )
+                logger.debug("Pre-fetched tool %s → %d chars", tool.name, len(str(result)))
+            except Exception as exc:
+                logger.warning("Pre-fetch of %s failed (%s) — skipping", tool.name, exc)
+
+        return augmented
+
+    def _infer_tool_args(self, tool: Any, curr_date: str = "", ticker: str = "") -> dict:
+        """Build an args dict for a tool by mapping its parameter names to
+        the extracted date/ticker values."""
+        schema: dict = {}
+        if hasattr(tool, "args_schema") and tool.args_schema is not None:
+            try:
+                if hasattr(tool.args_schema, "model_json_schema"):
+                    schema = tool.args_schema.model_json_schema()
+                elif hasattr(tool.args_schema, "schema"):
+                    schema = tool.args_schema.schema()
+            except Exception:
+                pass
+
+        args: dict = {}
+        for param_name in schema.get("properties", {}):
+            low = param_name.lower()
+            if "date" in low:
+                args[param_name] = curr_date
+            elif low in ("ticker", "symbol", "stock", "company"):
+                args[param_name] = ticker
+        return args
 
     # ------------------------------------------------------------------
     # Prompt construction
@@ -229,24 +251,13 @@ class ClaudeCLIChatModel(BaseChatModel):
     def _build_prompt(self, messages: List[BaseMessage]) -> str:
         parts: List[str] = []
 
-        # Always prepend the agent anchor to prevent Claude from meta-analyzing
-        # the conversation structure (a common failure mode in subprocess mode).
-        parts.append(_AGENT_ANCHOR)
-
-        # Prepend tool block if tools are bound
-        if self._tools:
-            parts.append(_TOOL_BLOCK_TEMPLATE.format(
-                tool_descriptions=self._describe_tools()
-            ))
-
-        # Prepend structured output instruction if schema set
+        # Structured output instruction (for PM / structured nodes)
         if self._output_schema:
             parts.append(_STRUCTURED_OUTPUT_TEMPLATE.format(
                 schema=json.dumps(self._output_schema, ensure_ascii=False, indent=2)
             ))
 
-        # Convert message history — skip messages with empty content to avoid
-        # dangling [USER]\n lines that can trigger meta-analysis.
+        # Render conversation — skip empty messages
         for msg in messages:
             content = getattr(msg, "content", "") or ""
             has_tool_calls = bool(getattr(msg, "tool_calls", None))
@@ -264,25 +275,21 @@ class ClaudeCLIChatModel(BaseChatModel):
             return f"<request>\n{msg.content}\n</request>"
 
         if isinstance(msg, AIMessage):
-            content = msg.content or ""
-            for tc in (msg.tool_calls or []):
-                content += (
-                    f"\nTOOL_CALL: {json.dumps({'name': tc['name'], 'args': tc['args']}, ensure_ascii=False)}"
-                )
-            return f"<previous_response>\n{content}\n</previous_response>"
+            return f"<previous_response>\n{msg.content or ''}\n</previous_response>"
 
         if isinstance(msg, ToolMessage):
-            tool_name = getattr(msg, "name", "tool")
-            return f"<tool_result name=\"{tool_name}\">\n{msg.content}\n</tool_result>"
+            # Pre-fetched data arrives as ToolMessage — present as context
+            tool_name = getattr(msg, "name", "data")
+            return f"<data source=\"{tool_name}\">\n{msg.content}\n</data>"
 
         return f"<message>\n{msg.content}\n</message>"
 
-    def _describe_tools(self) -> str:
+    def _describe_tools_UNUSED(self) -> str:
+        """Kept for reference. Not used since we switched to pre-fetch mode."""
         lines = []
         for tool in self._tools:
             name = getattr(tool, "name", str(tool))
             description = getattr(tool, "description", "")
-            # Try to get argument descriptions from the pydantic schema
             schema = {}
             if hasattr(tool, "args_schema") and tool.args_schema is not None:
                 try:
@@ -370,38 +377,11 @@ class ClaudeCLIChatModel(BaseChatModel):
     # ------------------------------------------------------------------
 
     def _parse_response(self, raw: str) -> AIMessage:
-        # Check for structured output mode first
-        if self._output_schema and not self._tools:
+        # Structured output: extract JSON object from the response
+        if self._output_schema:
             return AIMessage(content=self._extract_json(raw))
-
-        # Check for tool call
-        tool_call, text_before = self._extract_tool_call(raw)
-        if tool_call:
-            return AIMessage(
-                content=text_before,
-                tool_calls=[{
-                    "name": tool_call["name"],
-                    "args": tool_call.get("args", {}),
-                    "id": f"call_{uuid.uuid4().hex[:12]}",
-                    "type": "tool_call",
-                }],
-            )
-
+        # Plain text analysis response
         return AIMessage(content=raw)
-
-    def _extract_tool_call(self, text: str):
-        """Return (tool_call_dict, text_before) or (None, text)."""
-        # Match TOOL_CALL: followed by a JSON object (possibly multi-line)
-        pattern = r"TOOL_CALL:\s*(\{.*?\})\s*$"
-        match = re.search(pattern, text, re.DOTALL | re.MULTILINE)
-        if match:
-            try:
-                data = json.loads(match.group(1))
-                before = text[: match.start()].strip()
-                return data, before
-            except json.JSONDecodeError:
-                pass
-        return None, text
 
     def _extract_json(self, text: str) -> str:
         """Strip markdown fences and return the first JSON object found."""
