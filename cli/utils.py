@@ -15,6 +15,7 @@ ANALYST_ORDER = [
     ("Social Media Analyst", AnalystType.SOCIAL),
     ("News Analyst", AnalystType.NEWS),
     ("Fundamentals Analyst", AnalystType.FUNDAMENTALS),
+    ("Valuation Analyst (peer comparison & multiples)", AnalystType.VALUATION),
 ]
 
 
@@ -184,6 +185,9 @@ def _prompt_custom_model_id() -> str:
 
 def _select_model(provider: str, mode: str) -> str:
     """Select a model for the given provider and mode (quick/deep)."""
+    if provider.lower() == "claude_cli":
+        return "claude-cli"
+
     if provider.lower() == "openrouter":
         return select_openrouter_model()
 
@@ -232,6 +236,7 @@ def select_llm_provider() -> tuple[str, str | None]:
     """Select the LLM provider and its API endpoint."""
     # (display_name, provider_key, base_url)
     PROVIDERS = [
+        ("Claude CLI  (Local · No API Key Required)", "claude_cli", None),
         ("OpenAI", "openai", "https://api.openai.com/v1"),
         ("Google", "google", None),
         ("Anthropic", "anthropic", "https://api.anthropic.com/"),
@@ -266,6 +271,42 @@ def select_llm_provider() -> tuple[str, str | None]:
 
     provider, url = choice
     return provider, url
+
+
+def select_claude_cli_models() -> tuple[str, str]:
+    """Select quick-thinking and deep-thinking models for the Claude CLI provider."""
+    from tradingagents.llm_clients.model_catalog import get_model_options
+
+    quick_options = get_model_options("claude_cli", "quick")
+    deep_options  = get_model_options("claude_cli", "deep")
+
+    console.print("\n[bold cyan]Quick-thinking model[/bold cyan] — used by analysts & trader (speed matters)")
+    quick = questionary.select(
+        "Select quick-thinking model:",
+        choices=[questionary.Choice(display, value=val) for display, val in quick_options],
+        instruction="\n- Use arrow keys to navigate\n- Press Enter to select",
+        style=questionary.Style([
+            ("selected", "fg:cyan noinherit"),
+            ("highlighted", "fg:cyan noinherit"),
+            ("pointer", "fg:cyan noinherit"),
+        ]),
+    ).ask()
+
+    console.print("\n[bold magenta]Deep-thinking model[/bold magenta] — used by research manager & portfolio manager")
+    deep = questionary.select(
+        "Select deep-thinking model:",
+        choices=[questionary.Choice(display, value=val) for display, val in deep_options],
+        instruction="\n- Use arrow keys to navigate\n- Press Enter to select",
+        style=questionary.Style([
+            ("selected", "fg:magenta noinherit"),
+            ("highlighted", "fg:magenta noinherit"),
+            ("pointer", "fg:magenta noinherit"),
+        ]),
+    ).ask()
+
+    default_quick = quick_options[0][1]
+    default_deep  = deep_options[0][1]
+    return quick or default_quick, deep or default_deep
 
 
 def ask_openai_reasoning_effort() -> str:

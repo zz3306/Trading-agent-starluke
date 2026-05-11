@@ -5,6 +5,8 @@ _TRADINGAGENTS_HOME = os.path.join(os.path.expanduser("~"), ".tradingagents")
 DEFAULT_CONFIG = {
     "project_dir": os.path.abspath(os.path.join(os.path.dirname(__file__), ".")),
     "results_dir": os.getenv("TRADINGAGENTS_RESULTS_DIR", os.path.join(_TRADINGAGENTS_HOME, "logs")),
+    # Secondary save location: project-level reports/ folder (always saved automatically)
+    "results_dir_local": os.path.join(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")), "reports"),
     "data_cache_dir": os.getenv("TRADINGAGENTS_CACHE_DIR", os.path.join(_TRADINGAGENTS_HOME, "cache")),
     "memory_log_path": os.getenv("TRADINGAGENTS_MEMORY_LOG_PATH", os.path.join(_TRADINGAGENTS_HOME, "memory", "trading_memory.md")),
     # Optional cap on the number of resolved memory log entries. When set,
@@ -12,9 +14,19 @@ DEFAULT_CONFIG = {
     # Pending entries are never pruned. None disables rotation entirely.
     "memory_log_max_entries": None,
     # LLM settings
-    "llm_provider": "openai",
-    "deep_think_llm": "gpt-5.4",
-    "quick_think_llm": "gpt-5.4-mini",
+    # Use "claude_cli" to route all LLM calls through the local `claude` CLI
+    # (no API key required — uses your Claude Code login session).
+    "llm_provider": "claude_cli",
+    "deep_think_llm": "claude-cli",
+    "quick_think_llm": "claude-cli",
+    # Claude CLI subprocess options.
+    # skip_permissions: pass --dangerously-skip-permissions so the CLI never
+    #   blocks on tool-approval prompts when running non-interactively.
+    #   Set to False if you want interactive approval on a machine where that
+    #   is desirable.
+    "claude_cli_skip_permissions": True,
+    # Per-call timeout in seconds for Claude CLI subprocess calls.
+    "claude_cli_timeout": 600,
     # When None, each provider's client falls back to its own default endpoint
     # (api.openai.com for OpenAI, generativelanguage.googleapis.com for Gemini, ...).
     # The CLI overrides this per provider when the user picks one. Keeping a

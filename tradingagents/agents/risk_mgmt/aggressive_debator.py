@@ -1,3 +1,6 @@
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 def create_aggressive_debator(llm):
@@ -9,12 +12,12 @@ def create_aggressive_debator(llm):
         current_conservative_response = risk_debate_state.get("current_conservative_response", "")
         current_neutral_response = risk_debate_state.get("current_neutral_response", "")
 
-        market_research_report = state["market_report"]
-        sentiment_report = state["sentiment_report"]
-        news_report = state["news_report"]
-        fundamentals_report = state["fundamentals_report"]
+        market_research_report = state.get("market_report") or "Not available."
+        sentiment_report = state.get("sentiment_report") or "Not available."
+        news_report = state.get("news_report") or "Not available."
+        fundamentals_report = state.get("fundamentals_report") or "Not available."
 
-        trader_decision = state["trader_investment_plan"]
+        trader_decision = state.get("trader_investment_plan") or ""
 
         prompt = f"""As the Aggressive Risk Analyst, your role is to actively champion high-reward, high-risk opportunities, emphasizing bold strategies and competitive advantages. When evaluating the trader's decision or plan, focus intently on the potential upside, growth potential, and innovative benefits—even when these come with elevated risk. Use the provided market data and sentiment analysis to strengthen your arguments and challenge the opposing views. Specifically, respond directly to each point made by the conservative and neutral analysts, countering with data-driven rebuttals and persuasive reasoning. Highlight where their caution might miss critical opportunities or where their assumptions may be overly conservative. Here is the trader's decision:
 
@@ -30,9 +33,12 @@ Here is the current conversation history: {history} Here are the last arguments 
 
 Engage actively by addressing any specific concerns raised, refuting the weaknesses in their logic, and asserting the benefits of risk-taking to outpace market norms. Maintain a focus on debating and persuading, not just presenting data. Challenge each counterpoint to underscore why a high-risk approach is optimal. Output conversationally as if you are speaking without any special formatting."""
 
-        response = llm.invoke(prompt)
-
-        argument = f"Aggressive Analyst: {response.content}"
+        try:
+            response = llm.invoke(prompt)
+            argument = f"Aggressive Analyst: {response.content}"
+        except Exception as exc:
+            logger.warning("Aggressive Debator invocation failed: %s", exc)
+            argument = "Aggressive Analyst: [Unable to respond due to an error.]"
 
         new_risk_debate_state = {
             "history": history + "\n" + argument,

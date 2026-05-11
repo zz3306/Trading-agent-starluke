@@ -26,21 +26,39 @@ from rich.tree import Tree
 from rich import box
 from rich.align import Align
 from rich.rule import Rule
+from rich.console import Group as RichGroup
 
 from tradingagents.graph.trading_graph import TradingAgentsGraph
 from tradingagents.default_config import DEFAULT_CONFIG
 from cli.models import AnalystType
-from cli.utils import *
+from cli.utils import *  # includes select_claude_cli_models
 from cli.announcements import fetch_announcements, display_announcements
 from cli.stats_handler import StatsCallbackHandler
 
 console = Console()
 
 app = typer.Typer(
-    name="TradingAgents",
-    help="TradingAgents CLI: Multi-Agents LLM Financial Trading Framework",
+    name="STARLUKE",
+    help="STARLUKE: Multi-Agents LLM Financial Trading Framework",
     add_completion=True,  # Enable shell completion
 )
+
+_RAINBOW_COLORS = ["red", "yellow", "green", "cyan", "blue", "magenta"]
+
+
+def make_rainbow_text(text: str) -> Text:
+    """Color each non-space character with a cycling rainbow palette."""
+    rich_text = Text()
+    color_idx = 0
+    for char in text:
+        if char == "\n":
+            rich_text.append("\n")
+        elif char == " ":
+            rich_text.append(" ")
+        else:
+            rich_text.append(char, style=_RAINBOW_COLORS[color_idx % len(_RAINBOW_COLORS)])
+            color_idx += 1
+    return rich_text
 
 
 # Create a deque to store recent messages with a maximum length
@@ -260,9 +278,9 @@ def update_display(layout, spinner_text=None, stats_handler=None, start_time=Non
     # Header with welcome message
     layout["header"].update(
         Panel(
-            "[bold green]Welcome to TradingAgents CLI[/bold green]\n"
-            "[dim]© [Tauric Research](https://github.com/TauricResearch)[/dim]",
-            title="Welcome to TradingAgents",
+            "[bold green]STARLUKE — Multi-Agents LLM Financial Trading Framework[/bold green]\n"
+            "[dim]Fork of [TauricResearch/TradingAgents](https://github.com/TauricResearch)[/dim]",
+            title="STARLUKE",
             border_style="green",
             padding=(1, 2),
             expand=True,
@@ -469,21 +487,20 @@ def get_user_selections():
     with open(Path(__file__).parent / "static" / "welcome.txt", "r", encoding="utf-8") as f:
         welcome_ascii = f.read()
 
-    # Create welcome box content
-    welcome_content = f"{welcome_ascii}\n"
-    welcome_content += "[bold green]TradingAgents: Multi-Agents LLM Financial Trading Framework - CLI[/bold green]\n\n"
-    welcome_content += "[bold]Workflow Steps:[/bold]\n"
-    welcome_content += "I. Analyst Team → II. Research Team → III. Trader → IV. Risk Management → V. Portfolio Management\n\n"
-    welcome_content += (
-        "[dim]Built by [Tauric Research](https://github.com/TauricResearch)[/dim]"
+    # Create welcome box content with rainbow ASCII art
+    body = Text.from_markup(
+        "\n[bold green]STARLUKE: Multi-Agents LLM Financial Trading Framework - CLI[/bold green]\n\n"
+        "[bold]Workflow Steps:[/bold]\n"
+        "I. Analyst Team → II. Research Team → III. Trader → IV. Risk Management → V. Portfolio Management\n\n"
+        "[dim]Fork of [TauricResearch/TradingAgents](https://github.com/TauricResearch/TradingAgents)[/dim]"
     )
 
     # Create and center the welcome box
     welcome_box = Panel(
-        welcome_content,
+        RichGroup(make_rainbow_text(welcome_ascii), body),
         border_style="green",
         padding=(1, 2),
-        title="Welcome to TradingAgents",
+        title="Welcome to STARLUKE",
         subtitle="Multi-Agents LLM Financial Trading Framework",
     )
     console.print(Align.center(welcome_box))
@@ -559,45 +576,57 @@ def get_user_selections():
     )
     selected_llm_provider, backend_url = select_llm_provider()
 
-    # Step 7: Thinking agents
-    console.print(
-        create_question_box(
-            "Step 7: Thinking Agents", "Select your thinking agents for analysis"
-        )
-    )
-    selected_shallow_thinker = select_shallow_thinking_agent(selected_llm_provider)
-    selected_deep_thinker = select_deep_thinking_agent(selected_llm_provider)
-
-    # Step 8: Provider-specific thinking configuration
+    # Step 7 & 8: Skip for claude_cli — no model selection or thinking config needed
     thinking_level = None
     reasoning_effort = None
     anthropic_effort = None
-
     provider_lower = selected_llm_provider.lower()
-    if provider_lower == "google":
+
+    if provider_lower == "claude_cli":
         console.print(
             create_question_box(
-                "Step 8: Thinking Mode",
-                "Configure Gemini thinking mode"
+                "Step 7: Claude Model Selection",
+                "Choose which Claude models to use (no API key needed — uses your local Claude CLI session)"
             )
         )
-        thinking_level = ask_gemini_thinking_config()
-    elif provider_lower == "openai":
+        selected_shallow_thinker, selected_deep_thinker = select_claude_cli_models()
+        console.print(
+            f"[green]✓ Quick model:[/green] {selected_shallow_thinker}  "
+            f"[green]✓ Deep model:[/green] {selected_deep_thinker}"
+        )
+    else:
         console.print(
             create_question_box(
-                "Step 8: Reasoning Effort",
-                "Configure OpenAI reasoning effort level"
+                "Step 7: Thinking Agents", "Select your thinking agents for analysis"
             )
         )
-        reasoning_effort = ask_openai_reasoning_effort()
-    elif provider_lower == "anthropic":
-        console.print(
-            create_question_box(
-                "Step 8: Effort Level",
-                "Configure Claude effort level"
+        selected_shallow_thinker = select_shallow_thinking_agent(selected_llm_provider)
+        selected_deep_thinker = select_deep_thinking_agent(selected_llm_provider)
+
+        if provider_lower == "google":
+            console.print(
+                create_question_box(
+                    "Step 8: Thinking Mode",
+                    "Configure Gemini thinking mode"
+                )
             )
-        )
-        anthropic_effort = ask_anthropic_effort()
+            thinking_level = ask_gemini_thinking_config()
+        elif provider_lower == "openai":
+            console.print(
+                create_question_box(
+                    "Step 8: Reasoning Effort",
+                    "Configure OpenAI reasoning effort level"
+                )
+            )
+            reasoning_effort = ask_openai_reasoning_effort()
+        elif provider_lower == "anthropic":
+            console.print(
+                create_question_box(
+                    "Step 8: Effort Level",
+                    "Configure Claude effort level"
+                )
+            )
+            anthropic_effort = ask_anthropic_effort()
 
     return {
         "ticker": selected_ticker,
@@ -1198,22 +1227,23 @@ def run_analysis(checkpoint: bool = False):
     # Post-analysis prompts (outside Live context for clean interaction)
     console.print("\n[bold cyan]Analysis Complete![/bold cyan]\n")
 
-    # Prompt to save report
-    save_choice = typer.prompt("Save report?", default="Y").strip().upper()
-    if save_choice in ("Y", "YES", ""):
-        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-        default_path = Path.cwd() / "reports" / f"{selections['ticker']}_{timestamp}"
-        save_path_str = typer.prompt(
-            "Save path (press Enter for default)",
-            default=str(default_path)
-        ).strip()
-        save_path = Path(save_path_str)
+    # Auto-save to local project reports/ folder (always, no prompt)
+    local_reports_dir = config.get("results_dir_local")
+    if local_reports_dir:
+        local_path = Path(local_reports_dir) / selections["ticker"] / selections["analysis_date"]
         try:
-            report_file = save_report_to_disk(final_state, selections["ticker"], save_path)
-            console.print(f"\n[green]✓ Report saved to:[/green] {save_path.resolve()}")
-            console.print(f"  [dim]Complete report:[/dim] {report_file.name}")
+            save_report_to_disk(final_state, selections["ticker"], local_path)
+            console.print(f"[green]✓ Auto-saved to:[/green] {local_path.resolve()}")
         except Exception as e:
-            console.print(f"[red]Error saving report: {e}[/red]")
+            console.print(f"[yellow]Auto-save failed: {e}[/yellow]")
+
+    # Also save to ~/.tradingagents (original location, always)
+    home_path = Path(config["results_dir"]) / selections["ticker"] / selections["analysis_date"]
+    try:
+        save_report_to_disk(final_state, selections["ticker"], home_path)
+        console.print(f"[green]✓ Also saved to:[/green] {home_path.resolve()}")
+    except Exception as e:
+        console.print(f"[yellow]Home-dir save failed: {e}[/yellow]")
 
     # Prompt to display full report
     display_choice = typer.prompt("\nDisplay full report on screen?", default="Y").strip().upper()

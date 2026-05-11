@@ -150,6 +150,10 @@ class TradingAgentsGraph:
             if effort:
                 kwargs["effort"] = effort
 
+        elif provider == "claude_cli":
+            kwargs["claude_cli_skip_permissions"] = self.config.get("claude_cli_skip_permissions", True)
+            kwargs["claude_cli_timeout"] = self.config.get("claude_cli_timeout", 600)
+
         return kwargs
 
     def _create_tool_nodes(self) -> Dict[str, ToolNode]:
@@ -183,6 +187,13 @@ class TradingAgentsGraph:
                     get_fundamentals,
                     get_balance_sheet,
                     get_cashflow,
+                    get_income_statement,
+                ]
+            ),
+            "valuation": ToolNode(
+                [
+                    # Peer comparison tools
+                    get_fundamentals,
                     get_income_statement,
                 ]
             ),
@@ -360,6 +371,7 @@ class TradingAgentsGraph:
             "sentiment_report": final_state["sentiment_report"],
             "news_report": final_state["news_report"],
             "fundamentals_report": final_state["fundamentals_report"],
+            "valuation_report": final_state.get("valuation_report", ""),
             "investment_debate_state": {
                 "bull_history": final_state["investment_debate_state"]["bull_history"],
                 "bear_history": final_state["investment_debate_state"]["bear_history"],

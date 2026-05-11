@@ -37,9 +37,19 @@ class GraphSetup:
                 - "social": Social media analyst
                 - "news": News analyst
                 - "fundamentals": Fundamentals analyst
+                - "valuation": Valuation & peer comparison analyst (runs after fundamentals if both selected)
         """
         if len(selected_analysts) == 0:
             raise ValueError("Trading Agents Graph Setup Error: no analysts selected!")
+
+        # Ensure valuation always runs after fundamentals when both are selected
+        # so the valuation analyst can reuse the fundamentals_report.
+        ordered = list(selected_analysts)
+        if "valuation" in ordered and "fundamentals" in ordered:
+            ordered.remove("valuation")
+            idx = ordered.index("fundamentals")
+            ordered.insert(idx + 1, "valuation")
+        selected_analysts = ordered
 
         # Create analyst nodes
         analyst_nodes = {}
@@ -73,6 +83,13 @@ class GraphSetup:
             )
             delete_nodes["fundamentals"] = create_msg_delete()
             tool_nodes["fundamentals"] = self.tool_nodes["fundamentals"]
+
+        if "valuation" in selected_analysts:
+            analyst_nodes["valuation"] = create_valuation_analyst(
+                self.quick_thinking_llm
+            )
+            delete_nodes["valuation"] = create_msg_delete()
+            tool_nodes["valuation"] = self.tool_nodes["valuation"]
 
         # Create researcher and manager nodes
         bull_researcher_node = create_bull_researcher(self.quick_thinking_llm)

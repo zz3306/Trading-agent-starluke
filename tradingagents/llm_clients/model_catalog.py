@@ -101,6 +101,21 @@ MODEL_OPTIONS: ProviderModeOptions = {
             ("Custom model ID", "custom"),
         ],
     },
+    # Claude CLI: routes through the local `claude` binary — no API key needed.
+    "claude_cli": {
+        "quick": [
+            ("Sonnet 4.6 — Balanced speed & quality (recommended)", "claude-sonnet-4-6"),
+            ("Haiku 4.5  — Fastest, lightweight tasks",             "claude-haiku-4-5"),
+            ("Opus 4.5   — Most capable, slower",                   "claude-opus-4-5"),
+            ("Default    — Use CLI's current default model",        "claude-cli"),
+        ],
+        "deep": [
+            ("Opus 4.5   — Most capable, slower",                   "claude-opus-4-5"),
+            ("Sonnet 4.6 — Balanced speed & quality",               "claude-sonnet-4-6"),
+            ("Haiku 4.5  — Fastest, lightweight tasks",             "claude-haiku-4-5"),
+            ("Default    — Use CLI's current default model",        "claude-cli"),
+        ],
+    },
     # OpenRouter: fetched dynamically. Azure: any deployed model name.
     "ollama": {
         "quick": [

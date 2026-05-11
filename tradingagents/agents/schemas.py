@@ -120,8 +120,11 @@ class TraderProposal(BaseModel):
     )
     reasoning: str = Field(
         description=(
-            "The case for this action, anchored in the analysts' reports and "
-            "the research plan. Two to four sentences."
+            "Comprehensive reasoning for this action, anchored in specific evidence "
+            "from the analysts' reports and the research plan. Cover the key drivers, "
+            "risks, and how the research plan informs the transaction decision. "
+            "Be thorough — include data points, price levels, and specific arguments "
+            "from the debate that support this action."
         ),
     )
     entry_price: Optional[float] = Field(
@@ -185,8 +188,10 @@ class PortfolioDecision(BaseModel):
     )
     executive_summary: str = Field(
         description=(
-            "A concise action plan covering entry strategy, position sizing, "
-            "key risk levels, and time horizon. Two to four sentences."
+            "A detailed action plan covering entry strategy, position sizing, "
+            "key risk levels, stop-loss placement, and time horizon. "
+            "Reference specific price levels and sizing guidance from the debate. "
+            "Be concrete and actionable — traders should be able to execute directly from this."
         ),
     )
     investment_thesis: str = Field(
