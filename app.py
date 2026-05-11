@@ -1481,19 +1481,32 @@ Macro   ┘  Res. Mgr
             show("sentiment_report", t("no_sent"))
         elif tab == t("tab_risk"):
             rds = state.get("risk_debate_state", {})
+
+            # Show full debate histories (fall back to current_* if history empty)
+            def _risk_txt(history_key, current_key):
+                h = rds.get(history_key, "")
+                if h and len(h) > 20:
+                    return h
+                return rds.get(current_key, "") or "_Not available_"
+
             c1, c2, c3 = st.columns(3)
             with c1:
                 sac.divider(label="🔴 Aggressive", color="#ff1744")
-                agg = rds.get("current_aggressive_response", "_Not available_")
-                st.markdown(agg[:3000] + ("…" if len(agg) > 3000 else ""))
+                agg = _risk_txt("aggressive_history", "current_aggressive_response")
+                st.markdown(agg[:4000] + ("…" if len(agg) > 4000 else ""))
             with c2:
                 sac.divider(label="🟡 Neutral", color="#ffb800")
-                neu = rds.get("current_neutral_response", "_Not available_")
-                st.markdown(neu[:3000] + ("…" if len(neu) > 3000 else ""))
+                neu = _risk_txt("neutral_history", "current_neutral_response")
+                st.markdown(neu[:4000] + ("…" if len(neu) > 4000 else ""))
             with c3:
                 sac.divider(label="🟢 Conservative", color="#00e676")
-                con = rds.get("current_conservative_response", "_Not available_")
-                st.markdown(con[:3000] + ("…" if len(con) > 3000 else ""))
+                con = _risk_txt("conservative_history", "current_conservative_response")
+                st.markdown(con[:4000] + ("…" if len(con) > 4000 else ""))
+
+            judge = rds.get("judge_decision", "")
+            if judge:
+                sac.divider(label="⚖️ Risk Judge Decision", color="#36cfc9")
+                st.markdown(judge)
 
         st.divider()
         st.caption(t("completed_cap", ticker=ticker_label, date=date_label))
