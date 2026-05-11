@@ -48,14 +48,22 @@ def with_analyst_cache(analyst_type: str, node_fn: Callable) -> Callable:
         if path.exists():
             try:
                 cached = path.read_text(encoding="utf-8").strip()
-                if cached:
+                _poisoned = (
+                    len(cached) < 80
+                    or "prompt injection" in cached.lower()
+                    or "i need to flag" in cached[:300].lower()
+                    or cached.startswith("[ERROR]")
+                    or "not comply" in cached[:300].lower()
+                )
+                if cached and not _poisoned:
                     logger.info("Cache hit: %s for %s on %s", analyst_type, ticker, trade_date)
-                    # Return AIMessage (not HumanMessage) so conditional edges
-                    # can safely check .tool_calls without AttributeError.
                     return {
                         "messages": [AIMessage(content=f"[{analyst_type} report loaded from cache]")],
                         report_key: cached,
                     }
+                elif _poisoned:
+                    logger.warning("Poisoned cache for %s — deleting and re-running", analyst_type)
+                    path.unlink(missing_ok=True)
             except Exception as exc:
                 logger.warning("Cache read failed for %s: %s — re-running analyst", analyst_type, exc)
 
@@ -63,8 +71,14 @@ def with_analyst_cache(analyst_type: str, node_fn: Callable) -> Callable:
         result = node_fn(state)
 
         report = result.get(report_key, "")
-        # Only cache real reports (not short error placeholders)
-        if report and len(report) > 80:
+        # Only cache real reports (not short error/refusal placeholders)
+        _should_cache = (
+            report
+            and len(report) > 80
+            and "prompt injection" not in report.lower()
+            and not report.startswith("[ERROR]")
+        )
+        if _should_cache:
             try:
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_text(report, encoding="utf-8")

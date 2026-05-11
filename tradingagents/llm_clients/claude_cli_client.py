@@ -204,9 +204,33 @@ class ClaudeCLIChatModel(BaseChatModel):
         ticker_match = re.search(r"\b([A-Z]{1,5}(?:\.[A-Z]{1,2})?)\b", full_text)
         ticker = ticker_match.group(1) if ticker_match else ""
 
+        # Common technical indicators to pre-fetch for market analysts
+        _INDICATORS = ["rsi", "macd", "sma", "ema", "bbands", "adx", "atr"]
+
         augmented = list(messages)
         for tool in self._tools:
             try:
+                # get_indicators needs an explicit 'indicator' param — fetch each one
+                if tool.name == "get_indicators":
+                    combined = []
+                    for ind in _INDICATORS:
+                        try:
+                            result = tool.invoke({
+                                "symbol": ticker,
+                                "indicator": ind,
+                                "curr_date": curr_date,
+                            })
+                            combined.append(f"### {ind.upper()}\n{result}")
+                        except Exception as exc:
+                            logger.debug("Indicator %s failed: %s", ind, exc)
+                    if combined:
+                        augmented.append(ToolMessage(
+                            content=f"[Technical Indicators for {ticker}]\n" + "\n\n".join(combined),
+                            tool_call_id="prefetch_get_indicators",
+                            name="get_indicators",
+                        ))
+                    continue
+
                 args = self._infer_tool_args(tool, curr_date=curr_date, ticker=ticker)
                 result = tool.invoke(args)
                 augmented.append(
@@ -272,7 +296,7 @@ class ClaudeCLIChatModel(BaseChatModel):
             return f"<system>\n{msg.content}\n</system>"
 
         if isinstance(msg, HumanMessage):
-            return f"<request>\n{msg.content}\n</request>"
+            return f"<task>\n{msg.content}\n</task>"
 
         if isinstance(msg, AIMessage):
             return f"<previous_response>\n{msg.content or ''}\n</previous_response>"
