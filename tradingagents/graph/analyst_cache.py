@@ -22,8 +22,9 @@ _REPORT_KEY: dict[str, str] = {
 }
 
 
-def _cache_path(cache_dir: str, ticker: str, trade_date: str, analyst_type: str) -> Path:
-    return Path(cache_dir) / "analyst_cache" / ticker / trade_date / f"{analyst_type}.txt"
+def _cache_path(cache_dir: str, ticker: str, trade_date: str, analyst_type: str, lang: str = "english") -> Path:
+    suffix = f"_{lang}" if lang != "english" else ""
+    return Path(cache_dir) / "analyst_cache" / ticker / trade_date / f"{analyst_type}{suffix}.txt"
 
 
 def with_analyst_cache(analyst_type: str, node_fn: Callable) -> Callable:
@@ -38,11 +39,12 @@ def with_analyst_cache(analyst_type: str, node_fn: Callable) -> Callable:
         from tradingagents.dataflows.config import get_config
         config = get_config()
         cache_dir = config.get("data_cache_dir", "dataflows/data")
+        lang = config.get("output_language", "English").strip().lower().replace(" ", "_")
 
         ticker = state.get("company_of_interest", "UNKNOWN")
         trade_date = state.get("trade_date", "unknown")
 
-        path = _cache_path(cache_dir, ticker, str(trade_date), analyst_type)
+        path = _cache_path(cache_dir, ticker, str(trade_date), analyst_type, lang)
 
         # ── Cache hit ──────────────────────────────────────────────────
         if path.exists():

@@ -217,3 +217,17 @@ __marimo__/
 
 # Cache
 **/data_cache/
+
+# User-generated analysis data (personal, not for sharing)
+reports/
+signal_log.csv
+
+# TradingAgents runtime data (cache, logs, memory — machine-specific)
+.tradingagents/
+
+# Streamlit local preferences
+.starluke_prefs.json
+
+# API keys / env overrides
+.env.local
+.env.enterprise

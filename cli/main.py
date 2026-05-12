@@ -28,7 +28,7 @@ from rich.align import Align
 from rich.rule import Rule
 from rich.console import Group as RichGroup
 
-import sys, io, os
+import sys, io, os, subprocess
 
 # Force UTF-8 on Windows so emoji / CJK in help text don't crash cp1252.
 if sys.platform == "win32":
@@ -979,18 +979,24 @@ def update_research_team_status(status):
 
 
 # Ordered list of analysts for status transitions
-ANALYST_ORDER = ["market", "social", "news", "fundamentals"]
+ANALYST_ORDER = ["market", "social", "news", "fundamentals", "valuation", "macro", "options"]
 ANALYST_AGENT_NAMES = {
     "market": "Market Analyst",
     "social": "Social Analyst",
     "news": "News Analyst",
     "fundamentals": "Fundamentals Analyst",
+    "valuation": "Valuation Analyst",
+    "macro": "Macro Analyst",
+    "options": "Options Analyst",
 }
 ANALYST_REPORT_MAP = {
     "market": "market_report",
     "social": "sentiment_report",
     "news": "news_report",
     "fundamentals": "fundamentals_report",
+    "valuation": "valuation_report",
+    "macro": "macro_report",
+    "options": "options_report",
 }
 
 
@@ -1386,6 +1392,31 @@ def run_analysis(checkpoint: bool = False):
     display_choice = typer.prompt("\nDisplay full report on screen?", default="Y").strip().upper()
     if display_choice in ("Y", "YES", ""):
         display_complete_report(final_state)
+
+    # Offer to launch Streamlit UI
+    launch_ui = questionary.confirm(
+        "\nLaunch Streamlit report viewer in browser?", default=False
+    ).ask()
+    if launch_ui:
+        app_path = Path(__file__).parent.parent / "app.py"
+        console.print("[cyan]Starting Streamlit… open http://localhost:8501 in your browser (Ctrl+C to stop)[/cyan]")
+        try:
+            subprocess.Popen(
+                [sys.executable, "-m", "streamlit", "run", str(app_path)],
+                cwd=str(app_path.parent),
+            )
+            console.print("[green]✓ Streamlit launched.[/green]")
+        except Exception as exc:
+            console.print(f"[yellow]Could not launch Streamlit: {exc}\nRun manually: streamlit run app.py[/yellow]")
+
+
+@app.command(name="compare")
+def compare_cmd():
+    """Compare AI analysis reports for multiple companies side by side."""
+    from cli.compare import run_compare
+    from tradingagents.default_config import DEFAULT_CONFIG
+    reports_dir = Path(DEFAULT_CONFIG.get("results_dir_local", "reports"))
+    run_compare(reports_dir)
 
 
 @app.command()

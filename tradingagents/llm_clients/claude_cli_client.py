@@ -66,18 +66,13 @@ def find_claude_exe() -> str:
     if sys.platform != "win32":
         return shutil.which("claude") or "claude"
 
-    # Strategies 1 & 2
-    exe = shutil.which("claude") or shutil.which("claude.cmd")
-    if exe:
-        return exe
-
-    # Strategy 3 — probe known Windows locations
     home = os.path.expanduser("~")
+
+    # Strategy 1 — probe known Windows locations first (deterministic, avoids
+    # broken PATH entries that shutil.which might pick up before the real exe).
     candidates = [
-        # ~/.local/bin (Scoop / manual installs)
         os.path.join(home, ".local", "bin", "claude.exe"),
         os.path.join(home, ".local", "bin", "claude.cmd"),
-        # npm global
         os.path.join(home, "AppData", "Roaming", "npm", "claude.cmd"),
         os.path.join(home, "AppData", "Local", "Programs", "claude", "claude.exe"),
         os.path.expandvars(r"%APPDATA%\npm\claude.cmd"),
@@ -87,13 +82,21 @@ def find_claude_exe() -> str:
         if os.path.isfile(c):
             return c
 
-    # Strategy 4 — augment PATH with npm global bin + ~/.local/bin and retry
+    # Strategy 2 — shutil.which with existence validation (guards against
+    # malformed PATH entries that resolve to non-existent paths).
+    for name in ("claude", "claude.cmd"):
+        exe = shutil.which(name)
+        if exe and os.path.isfile(exe):
+            return exe
+
+    # Strategy 3 — augment PATH with common install dirs and retry which()
     npm_bin = os.path.join(home, "AppData", "Roaming", "npm")
     local_bin = os.path.join(home, ".local", "bin")
     augmented = local_bin + os.pathsep + npm_bin + os.pathsep + os.environ.get("PATH", "")
-    exe = shutil.which("claude", path=augmented) or shutil.which("claude.cmd", path=augmented)
-    if exe:
-        return exe
+    for name in ("claude", "claude.cmd"):
+        exe = shutil.which(name, path=augmented)
+        if exe and os.path.isfile(exe):
+            return exe
 
     return "claude"  # fallback; Popen will raise FileNotFoundError if missing
 
