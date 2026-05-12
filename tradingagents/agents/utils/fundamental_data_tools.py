@@ -2,17 +2,23 @@ from langchain_core.tools import tool
 from typing import Annotated
 from tradingagents.dataflows.interface import route_to_vendor
 
+_TICKER_DESC = (
+    "Full ticker symbol including any exchange suffix. "
+    "Examples: AAPL (US), 600973.SS (Shanghai A-share), 0700.HK (Hong Kong), 7203.T (Tokyo). "
+    "IMPORTANT: always pass the complete symbol — never truncate or drop the exchange suffix."
+)
+
 
 @tool
 def get_fundamentals(
-    ticker: Annotated[str, "ticker symbol"],
+    ticker: Annotated[str, _TICKER_DESC],
     curr_date: Annotated[str, "current date you are trading at, yyyy-mm-dd"],
 ) -> str:
     """
     Retrieve comprehensive fundamental data for a given ticker symbol.
     Uses the configured fundamental_data vendor.
     Args:
-        ticker (str): Ticker symbol of the company
+        ticker (str): Full ticker symbol including exchange suffix (e.g. AAPL, 600973.SS, 0700.HK).
         curr_date (str): Current date you are trading at, yyyy-mm-dd
     Returns:
         str: A formatted report containing comprehensive fundamental data
@@ -22,7 +28,7 @@ def get_fundamentals(
 
 @tool
 def get_balance_sheet(
-    ticker: Annotated[str, "ticker symbol"],
+    ticker: Annotated[str, _TICKER_DESC],
     freq: Annotated[str, "reporting frequency: annual/quarterly"] = "quarterly",
     curr_date: Annotated[str, "current date you are trading at, yyyy-mm-dd"] = None,
 ) -> str:
@@ -30,7 +36,7 @@ def get_balance_sheet(
     Retrieve balance sheet data for a given ticker symbol.
     Uses the configured fundamental_data vendor.
     Args:
-        ticker (str): Ticker symbol of the company
+        ticker (str): Full ticker symbol including exchange suffix (e.g. AAPL, 600973.SS, 0700.HK).
         freq (str): Reporting frequency: annual/quarterly (default quarterly)
         curr_date (str): Current date you are trading at, yyyy-mm-dd
     Returns:
@@ -41,7 +47,7 @@ def get_balance_sheet(
 
 @tool
 def get_cashflow(
-    ticker: Annotated[str, "ticker symbol"],
+    ticker: Annotated[str, _TICKER_DESC],
     freq: Annotated[str, "reporting frequency: annual/quarterly"] = "quarterly",
     curr_date: Annotated[str, "current date you are trading at, yyyy-mm-dd"] = None,
 ) -> str:
@@ -49,7 +55,7 @@ def get_cashflow(
     Retrieve cash flow statement data for a given ticker symbol.
     Uses the configured fundamental_data vendor.
     Args:
-        ticker (str): Ticker symbol of the company
+        ticker (str): Full ticker symbol including exchange suffix (e.g. AAPL, 600973.SS, 0700.HK).
         freq (str): Reporting frequency: annual/quarterly (default quarterly)
         curr_date (str): Current date you are trading at, yyyy-mm-dd
     Returns:
@@ -60,7 +66,7 @@ def get_cashflow(
 
 @tool
 def get_income_statement(
-    ticker: Annotated[str, "ticker symbol"],
+    ticker: Annotated[str, _TICKER_DESC],
     freq: Annotated[str, "reporting frequency: annual/quarterly"] = "quarterly",
     curr_date: Annotated[str, "current date you are trading at, yyyy-mm-dd"] = None,
 ) -> str:
@@ -68,7 +74,7 @@ def get_income_statement(
     Retrieve income statement data for a given ticker symbol.
     Uses the configured fundamental_data vendor.
     Args:
-        ticker (str): Ticker symbol of the company
+        ticker (str): Full ticker symbol including exchange suffix (e.g. AAPL, 600973.SS, 0700.HK).
         freq (str): Reporting frequency: annual/quarterly (default quarterly)
         curr_date (str): Current date you are trading at, yyyy-mm-dd
     Returns:
