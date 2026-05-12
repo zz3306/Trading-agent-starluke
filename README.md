@@ -56,6 +56,12 @@ Each agent has a defined role. They debate, challenge each other's assumptions, 
 
 ---
 
+## Sample output
+
+[View a live demo →](sample_output.html) — bilingual EN / 中文, DIS vs GOOG, toggleable analyst sections.
+
+---
+
 ## Key features
 
 | Feature | Detail |
