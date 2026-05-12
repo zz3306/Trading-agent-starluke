@@ -18,6 +18,12 @@
   <img src="assets/rainbow.png" alt="" width="480" />
 </p>
 
+<p align="center">
+  <a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/zz3306/Trading-agent-starluke/main/sample_output.html"><strong>📄 View sample output →</strong></a>
+  <br/>
+  <sub>Condensed excerpt from real DIS &amp; GOOG analysis runs — shows report structure and bilingual EN/中文 toggle</sub>
+</p>
+
 ---
 
 Run a full institutional-grade stock analysis pipeline entirely through your local [Claude Code](https://claude.ai/code) session. No Anthropic API key. No OpenAI key. Just your existing Claude login.
@@ -58,7 +64,7 @@ Each agent has a defined role. They debate, challenge each other's assumptions, 
 
 ## Sample output
 
-[View a live demo →](sample_output.html) — bilingual EN / 中文, DIS vs GOOG, toggleable analyst sections.
+[View a live demo →](https://htmlpreview.github.io/?https://raw.githubusercontent.com/zz3306/Trading-agent-starluke/main/sample_output.html) — condensed excerpt from real DIS & GOOG runs. Shows report structure and bilingual EN / 中文 toggle.
 
 ---
 
