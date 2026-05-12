@@ -159,7 +159,7 @@ class TradingAgentsGraph:
 
         elif provider == "claude_cli":
             kwargs["claude_cli_skip_permissions"] = self.config.get("claude_cli_skip_permissions", True)
-            kwargs["claude_cli_timeout"] = self.config.get("claude_cli_timeout", 900)
+            kwargs["claude_cli_timeout"] = self.config.get("claude_cli_timeout", 1200)
 
         return kwargs
 
