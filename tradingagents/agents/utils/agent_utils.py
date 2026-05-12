@@ -40,11 +40,30 @@ def get_language_instruction() -> str:
 
 def build_instrument_context(ticker: str) -> str:
     """Describe the exact instrument so agents preserve exchange-qualified tickers."""
-    return (
+    base = (
         f"The instrument to analyze is `{ticker}`. "
         "Use this exact ticker in every tool call, report, and recommendation, "
         "preserving any exchange suffix (e.g. `.TO`, `.L`, `.HK`, `.T`)."
     )
+
+    upper = ticker.upper()
+    if upper.endswith(".SS") or upper.endswith(".SZ"):
+        base += (
+            " This is a Chinese A-share listed on "
+            + ("the Shanghai Stock Exchange (SSE)" if upper.endswith(".SS") else "the Shenzhen Stock Exchange (SZSE)")
+            + ". Price data is quoted in CNY (Chinese Yuan). "
+            "All OHLCV values, technical indicators, and financial figures returned by tools "
+            "are valid and correct — do NOT report them as N/A, unavailable, or unresolvable "
+            "simply because the format differs from US equities. "
+            "Analyze the data as-is and write a full report."
+        )
+    elif upper.endswith(".HK"):
+        base += (
+            " This is a Hong Kong-listed stock (HKEX). "
+            "Price data is quoted in HKD. Treat all tool-returned data as valid."
+        )
+
+    return base
 
 def create_msg_delete():
     def delete_messages(state):
