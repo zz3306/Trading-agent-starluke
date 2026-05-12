@@ -371,33 +371,45 @@ class ClaudeCLIChatModel(BaseChatModel):
         if self.model_name and self.model_name != "claude-cli":
             cmd += ["--model", self.model_name]
 
-        try:
-            proc = subprocess.Popen(
-                cmd + ["-p", prompt],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                stdin=subprocess.DEVNULL,
-                encoding="utf-8",
-                errors="replace",
-                **extra_kwargs,
-            )
-            stdout, stderr = proc.communicate(timeout=self.timeout)
+        max_attempts = 2
+        for attempt in range(1, max_attempts + 1):
+            # Each retry gets 50% more time than the previous attempt.
+            attempt_timeout = int(self.timeout * (1 + 0.5 * (attempt - 1)))
+            try:
+                proc = subprocess.Popen(
+                    cmd + ["-p", prompt],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    stdin=subprocess.DEVNULL,
+                    encoding="utf-8",
+                    errors="replace",
+                    **extra_kwargs,
+                )
+                stdout, stderr = proc.communicate(timeout=attempt_timeout)
 
-        except subprocess.TimeoutExpired:
-            proc.kill()
-            proc.communicate()
-            return "[ERROR] Claude CLI timed out"
-        except FileNotFoundError:
-            return (
-                f"[ERROR] 'claude' command not found at '{claude_exe}' — "
-                f"make sure Claude Code CLI is installed. "
-                f"PATH searched: {env['PATH'][:200]}"
-            )
+            except subprocess.TimeoutExpired:
+                proc.kill()
+                proc.communicate()
+                if attempt < max_attempts:
+                    # retry with extended timeout
+                    continue
+                return (
+                    f"[ERROR] Claude CLI timed out after {attempt_timeout}s "
+                    f"({max_attempts} attempts). Try increasing claude_cli_timeout in config."
+                )
+            except FileNotFoundError:
+                return (
+                    f"[ERROR] 'claude' command not found at '{claude_exe}' — "
+                    f"make sure Claude Code CLI is installed. "
+                    f"PATH searched: {env['PATH'][:200]}"
+                )
 
-        if proc.returncode != 0:
-            return f"[ERROR] Claude CLI exit {proc.returncode}: {stderr.strip()}"
+            if proc.returncode != 0:
+                return f"[ERROR] Claude CLI exit {proc.returncode}: {stderr.strip()}"
 
-        return stdout.strip()
+            return stdout.strip()
+
+        return "[ERROR] Claude CLI failed after all retry attempts"
 
     # ------------------------------------------------------------------
     # Response parsing
